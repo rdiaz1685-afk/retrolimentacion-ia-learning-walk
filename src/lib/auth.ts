@@ -1,0 +1,66 @@
+
+import NextAuth, { type DefaultSession } from "next-auth";
+import Google from "next-auth/providers/google";
+import { CAMPUS_DATA, RECTORIA_EMAILS } from "@/config/campus-config";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+    providers: [
+        Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+            authorization: {
+                params: {
+                    scope: "openid email profile https://www.googleapis.com/auth/spreadsheets.readonly",
+                },
+            },
+        }),
+    ],
+    callbacks: {
+        async jwt({ token, account }) {
+            if (account) {
+                token.accessToken = account.access_token;
+            }
+            return token;
+        },
+        async session({ session, token }: { session: any, token: any }) {
+            if (session.user && session.user.email) {
+                const email = session.user.email;
+                let role = "GUEST";
+                let campus = null;
+
+                if (RECTORIA_EMAILS.includes(email)) {
+                    role = "RECTOR";
+                } else {
+                    for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
+                        if (data.emails_directora.includes(email)) {
+                            role = "DIRECTORA";
+                            campus = campusName;
+                            break;
+                        }
+                        if (data.emails_coordinadores.includes(email)) {
+                            role = "COORDINADORA";
+                            campus = campusName;
+                            break;
+                        }
+                    }
+                }
+
+                session.user.role = role;
+                session.user.campus = campus;
+                session.accessToken = token.accessToken;
+            }
+            return session;
+        },
+    },
+    secret: process.env.AUTH_SECRET,
+});
+
+declare module "next-auth" {
+    interface Session {
+        accessToken?: string;
+        user: {
+            role?: string;
+            campus?: string;
+        } & DefaultSession["user"];
+    }
+}
