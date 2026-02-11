@@ -55,9 +55,13 @@ export default function ChatPage() {
             <div className="flex-1 overflow-hidden flex flex-col glass-card rounded-2xl shadow-xl">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
                     {messages.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-                            <Bot className="h-12 w-12 text-slate-400" />
-                            <p className="max-w-[300px]">Hola, soy tu Master Academic. ¿Qué te gustaría saber hoy sobre las observaciones?</p>
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-100">
+                            <Bot className="h-16 w-16 text-slate-600 mb-2" />
+                            <p className="max-w-[400px] text-lg font-medium text-slate-700">
+                                Hola, soy tu <span className="text-indigo-600 font-bold">Master Academic</span>.
+                                <br />
+                                ¿Qué te gustaría saber hoy sobre las observaciones?
+                            </p>
                         </div>
                     )}
                     {messages.map((m, i) => (
