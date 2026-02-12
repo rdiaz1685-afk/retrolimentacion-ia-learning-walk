@@ -144,7 +144,7 @@ export default async function DashboardPage() {
                             }, 0);
 
                             const currentWeekData = maxWeek > 0
-                                ? data.filter((_, idx) => parseInt(filteredEvaluations[idx]?.semana) === maxWeek)
+                                ? data.filter((_: any, idx: number) => parseInt(filteredEvaluations[idx]?.semana) === maxWeek)
                                 : data.slice().reverse().slice(0, 20);
 
                             const displayData = maxWeek > 0 ? currentWeekData.reverse() : currentWeekData;
