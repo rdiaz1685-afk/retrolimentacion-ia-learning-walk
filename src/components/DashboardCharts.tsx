@@ -17,22 +17,32 @@ import {
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f97316', '#10b981'];
 
-export const DashboardCharts = ({ data, role }: { data: any[], role?: string }) => {
+export const DashboardCharts = ({ data, role, progressData }: { data: any[], role?: string, progressData?: any[] }) => {
     const isRector = role === "RECTOR";
+    const isCoordinadora = role === "COORDINADORA";
 
     // Process data for charts
-    const aggregationKey = isRector ? "campus" : "coordinadora";
+    let pieData = [];
+    let chartTitle = "";
 
-    const counts = data.reduce((acc: any, curr: any) => {
-        const key = curr[aggregationKey] || (isRector ? "Sin Campus" : "Sin Coordinadora");
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-    }, {});
+    if (isCoordinadora && progressData) {
+        pieData = progressData;
+        chartTitle = "Avance de Evaluaciones (Tus Maestras)";
+    } else {
+        const aggregationKey = isRector ? "campus" : "coordinadora";
 
-    const pieData = Object.keys(counts).map(name => ({
-        name,
-        value: counts[name]
-    }));
+        const counts = data.reduce((acc: any, curr: any) => {
+            const key = curr[aggregationKey] || (isRector ? "Sin Campus" : "Sin Coordinadora");
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+
+        pieData = Object.keys(counts).map(name => ({
+            name,
+            value: counts[name]
+        }));
+        chartTitle = isRector ? "Evaluaciones por Campus" : "Evaluaciones por Coordinadora";
+    }
 
     const barData = [
         { name: 'Semana 1', count: 12 },
@@ -41,11 +51,15 @@ export const DashboardCharts = ({ data, role }: { data: any[], role?: string }) 
         { name: 'Semana 4', count: data.length },
     ];
 
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
+        return `${(percent * 100).toFixed(0)}%`;
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 min-h-[400px]">
                 <h2 className="text-xl font-bold text-slate-900 mb-6 font-sans">
-                    {isRector ? "Evaluaciones por Campus" : "Evaluaciones por Coordinadora"}
+                    {chartTitle}
                 </h2>
                 <div className="h-72 outline-none">
                     <ResponsiveContainer width="100%" height="100%">
@@ -58,6 +72,7 @@ export const DashboardCharts = ({ data, role }: { data: any[], role?: string }) 
                                 outerRadius={80}
                                 paddingAngle={5}
                                 dataKey="value"
+                                label={renderCustomizedLabel}
                             >
                                 {pieData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

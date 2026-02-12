@@ -24,22 +24,60 @@ export default async function DashboardPage() {
     }
 
     const user = session.user;
-    let rawData = [];
+    let context: any = { evaluations: [], teachers: [], users: [] };
 
     try {
         if (user.role === "RECTOR") {
-            rawData = await getAllData(session.accessToken!);
+            context = await getAllData(session.accessToken!);
         } else if (user.campus) {
-            rawData = await getCampusData(user.campus, session.accessToken!);
+            context = await getCampusData(user.campus, session.accessToken!);
         }
     } catch (error) {
         console.error("Error loading dashboard data:", error);
     }
 
+    const { evaluations: rawEvaluations, teachers, users } = context;
+
+    // Filter evaluations by role
+    let filteredEvaluations = rawEvaluations;
+    let progressData = undefined;
+
+    if (user.role === "COORDINADORA" && user.email) {
+        // 1. Find the current coordinator's ID in the users list
+        const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+
+        if (currentUser) {
+            const coordinatorId = currentUser.id_usuario;
+
+            // 2. Find teachers assigned to this coordinator
+            // We'll try some common column names: id_usuario_coordinador, id_coordinadora, id_coordinador
+            const assignedTeachers = teachers.filter((t: any) =>
+                t.id_usuario_coordinador === coordinatorId ||
+                t.id_coordinadora === coordinatorId ||
+                t.id_coordinador === coordinatorId
+            );
+
+            if (assignedTeachers.length > 0) {
+                // 3. Find which of these teachers have been evaluated
+                const evaluatedTeacherIds = new Set(rawEvaluations.map((e: any) => e.id_maestro));
+                const evaluatedCount = assignedTeachers.filter((t: any) => evaluatedTeacherIds.has(t.id_maestro)).length;
+                const pendingCount = assignedTeachers.length - evaluatedCount;
+
+                progressData = [
+                    { name: "Evaluadas", value: evaluatedCount },
+                    { name: "Pendientes", value: pendingCount }
+                ];
+
+                // Also filter the observations list to only show theirs
+                filteredEvaluations = rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
+            }
+        }
+    }
+
     // Map real data to UI fields
-    const data = rawData.map((item: any) => ({
+    const data = filteredEvaluations.map((item: any) => ({
         maestra: item.nombre_maestro || item.id_maestro || "Maestra no especificada",
-        coordinadora: item.id_usuario_coordinador || "Coordinadora",
+        coordinadora: item.nombre_coordinador || item.id_usuario_coordinador || "Coordinadora",
         campus: item.campus || user.campus,
         wows: item.WOWS_Texto || "",
         wonders: item.WONDERS_Texto || "",
@@ -49,9 +87,9 @@ export default async function DashboardPage() {
     // Statistics calculation based on real data
     const stats = [
         { label: "Total Observaciones", value: data.length, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-        { label: "Wows Registrados", value: data.filter(d => d.wows).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
-        { label: "Wonders Detectados", value: data.filter(d => d.wonders).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
-        { label: "Última Semana", value: rawData[rawData.length - 1]?.semana || "N/A", icon: TrendingUp, color: "text-green-600", bg: "bg-green-100" },
+        { label: "Wows Registrados", value: data.filter((d: any) => d.wows).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
+        { label: "Wonders Detectados", value: data.filter((d: any) => d.wonders).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
+        { label: "Última Semana", value: rawEvaluations[rawEvaluations.length - 1]?.semana || "N/A", icon: TrendingUp, color: "text-green-600", bg: "bg-green-100" },
     ];
 
     return (
@@ -91,7 +129,7 @@ export default async function DashboardPage() {
                     ))}
                 </div>
 
-                <DashboardCharts data={data} role={user.role} />
+                <DashboardCharts data={data} role={user.role} progressData={progressData} />
             </div>
 
             <div className="grid grid-cols-1 gap-8 mt-8 print:hidden">
@@ -100,29 +138,22 @@ export default async function DashboardPage() {
                     <div className="space-y-4">
                         {(() => {
                             // Filter logic for current week
-                            // Assuming 'semana' is a number or string like "1", "2", ... "10"
-                            // We will try to find the max week number from the data and show only that.
-                            // If 'semana' is not reliable, we'd need date parsing.
-                            // Based on 'rawData' having 'semana', let's use that.
-
-                            const maxWeek = rawData.reduce((max: number, item: any) => {
+                            const maxWeek = rawEvaluations.reduce((max: number, item: any) => {
                                 const w = parseInt(item.semana);
                                 return !isNaN(w) && w > max ? w : max;
                             }, 0);
 
                             const currentWeekData = maxWeek > 0
-                                ? data.filter((_, idx) => parseInt(rawData[idx]?.semana) === maxWeek)
-                                : data.slice().reverse().slice(0, 20); // Fallback to last 20 if no valid weeks found
+                                ? data.filter((_, idx) => parseInt(filteredEvaluations[idx]?.semana) === maxWeek)
+                                : data.slice().reverse().slice(0, 20);
 
-                            // If we filtered by week, we still might want to show them in some order (e.g. latest first?)
-                            // The original data seems to be chronological.
                             const displayData = maxWeek > 0 ? currentWeekData.reverse() : currentWeekData;
 
                             if (displayData.length === 0) {
                                 return <p className="text-slate-500 text-center py-8">No se encontraron datos para la semana actual.</p>;
                             }
 
-                            return displayData.map((obs, i) => (
+                            return displayData.map((obs: any, i: number) => (
                                 <DashboardObservationItem
                                     key={i}
                                     maestra={obs.maestra}
