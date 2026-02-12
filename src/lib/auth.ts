@@ -28,12 +28,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 let role = "GUEST";
                 let campus = null;
 
-                console.log("AUTH DEBUG - Checking email:", email);
-                console.log("AUTH DEBUG - Rectoria list:", RECTORIA_EMAILS.map(e => e.toLowerCase()));
-
                 if (RECTORIA_EMAILS.map(e => e.toLowerCase()).includes(email)) {
                     role = "RECTOR";
-                    console.log("AUTH DEBUG - Assigned RECTOR");
                 } else {
                     for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
                         const directores = data.emails_directora.map(e => e.toLowerCase());
@@ -42,20 +38,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         if (directores.includes(email)) {
                             role = "DIRECTORA";
                             campus = campusName;
-                            console.log(`AUTH DEBUG - Assigned DIRECTORA for ${campusName}`);
                             break;
                         }
                         if (coordinadores.includes(email)) {
                             role = "COORDINADORA";
                             campus = campusName;
-                            console.log(`AUTH DEBUG - Assigned COORDINADORA for ${campusName}`);
                             break;
                         }
                     }
-                }
-
-                if (role === "GUEST") {
-                    console.log("AUTH DEBUG - Role remains GUEST");
                 }
 
                 session.user.role = role;

@@ -17,16 +17,21 @@ import {
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f97316', '#10b981'];
 
-export const DashboardCharts = ({ data }: { data: any[] }) => {
+export const DashboardCharts = ({ data, role }: { data: any[], role?: string }) => {
+    const isRector = role === "RECTOR";
+
     // Process data for charts
-    const campusCounts = data.reduce((acc: any, curr: any) => {
-        acc[curr.campus] = (acc[curr.campus] || 0) + 1;
+    const aggregationKey = isRector ? "campus" : "coordinadora";
+
+    const counts = data.reduce((acc: any, curr: any) => {
+        const key = curr[aggregationKey] || (isRector ? "Sin Campus" : "Sin Coordinadora");
+        acc[key] = (acc[key] || 0) + 1;
         return acc;
     }, {});
 
-    const pieData = Object.keys(campusCounts).map(name => ({
+    const pieData = Object.keys(counts).map(name => ({
         name,
-        value: campusCounts[name]
+        value: counts[name]
     }));
 
     const barData = [
@@ -39,7 +44,9 @@ export const DashboardCharts = ({ data }: { data: any[] }) => {
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 min-h-[400px]">
-                <h2 className="text-xl font-bold text-slate-900 mb-6 font-sans">Evaluaciones por Campus</h2>
+                <h2 className="text-xl font-bold text-slate-900 mb-6 font-sans">
+                    {isRector ? "Evaluaciones por Campus" : "Evaluaciones por Coordinadora"}
+                </h2>
                 <div className="h-72 outline-none">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
