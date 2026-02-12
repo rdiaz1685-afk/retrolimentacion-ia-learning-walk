@@ -1,7 +1,7 @@
 
 import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
-import { CAMPUS_DATA, RECTORIA_EMAILS } from "@/config/campus-config";
+import { CAMPUS_DATA, RECTORIA_EMAILS, SIMULATION_CONFIG } from "@/config/campus-config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     providers: [
@@ -24,11 +24,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
         async session({ session, token }: { session: any, token: any }) {
             if (session.user && session.user.email) {
-                const email = session.user.email.toLowerCase();
+                let email = session.user.email.toLowerCase();
                 let role = "GUEST";
                 let campus = null;
 
-                if (RECTORIA_EMAILS.map(e => e.toLowerCase()).includes(email)) {
+                // Aplicar simulación si existe para este correo
+                const sim = SIMULATION_CONFIG[email];
+                if (sim) {
+                    role = sim.role;
+                    campus = sim.campus;
+                    if (sim.mockEmail) {
+                        // Importante: Sobrescribimos el email de la sesión para que el Dashboard 
+                        // encuentre a esta persona en la lista de usuarios de Google Sheets
+                        session.user.email = sim.mockEmail;
+                    }
+                } else if (RECTORIA_EMAILS.map(e => e.toLowerCase()).includes(email)) {
                     role = "RECTOR";
                 } else {
                     for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
