@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import axios from "axios";
+import { ExportChatPdfButton } from "@/components/ExportChatPdfButton";
 
 export default function ChatPage() {
     const [messages, setMessages] = useState<any[]>([]);
@@ -42,13 +43,18 @@ export default function ChatPage() {
 
     return (
         <div className="flex flex-col h-[calc(100vh-2rem)] p-4 md:p-8">
-            <div className="flex items-center gap-x-3 mb-8">
-                <div className="p-2 bg-pink-100 rounded-lg">
-                    <Sparkles className="h-6 w-6 text-pink-600" />
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-x-3">
+                    <div className="p-2 bg-pink-100 rounded-lg">
+                        <Sparkles className="h-6 w-6 text-pink-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Asistente Master Academic</h1>
+                        <p className="text-sm text-slate-500">Consulta tendencias, propuestas de mejora y análisis de tu campus.</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Asistente Master Academic</h1>
-                    <p className="text-sm text-slate-500">Consulta tendencias, propuestas de mejora y análisis de tu campus.</p>
+                <div className="hidden md:block">
+                    <ExportChatPdfButton messages={messages} />
                 </div>
             </div>
 
