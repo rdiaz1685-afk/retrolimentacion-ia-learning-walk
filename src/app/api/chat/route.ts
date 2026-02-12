@@ -24,12 +24,12 @@ export async function POST(req: NextRequest) {
     try {
         console.log('[CHAT DEBUG] Usuario:', user.email, 'Rol:', user.role, 'Campus:', user.campus);
         if (user.role === "RECTOR") {
-            console.log('[CHAT DEBUG] Obteniendo datos de TODOS los campus...');
-            data = await getAllData(session.accessToken!);
+            const { evaluations } = await getAllData(session.accessToken!);
+            data = evaluations;
             console.log('[CHAT DEBUG] Datos obtenidos:', data.length, 'observaciones');
         } else if (user.campus) {
-            console.log('[CHAT DEBUG] Obteniendo datos del campus:', user.campus);
-            data = await getCampusData(user.campus, session.accessToken!);
+            const { evaluations } = await getCampusData(user.campus, session.accessToken!);
+            data = evaluations;
             console.log('[CHAT DEBUG] Datos obtenidos:', data.length, 'observaciones');
         }
     } catch (e) {
