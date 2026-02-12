@@ -34,7 +34,8 @@ export const CAMPUS_DATA = {
             "pluna@cambridgemty.edu.mx"
         ],
         "emails_directora": [
-            "emma.herrera@cambridgemty.edu.mx"
+            "emma.herrera@cambridgemty.edu.mx",
+            "rafael.diaz@cambridgemty.edu.mx"
         ]
     },
     "Cumbres": {
@@ -72,8 +73,7 @@ export const CAMPUS_DATA = {
 
 export const RECTORIA_EMAILS = [
     "ernesto.matias@cambridgemty.edu.mx",
-    "lramos@cambridgemty.edu.mx",
-    "rafael.diaz@cambridgemty.edu.mx"
+    "lramos@cambridgemty.edu.mx"
 ];
 
 export const SHEET_NAME = "evaluaciones";

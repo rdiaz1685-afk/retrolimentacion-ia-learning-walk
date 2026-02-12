@@ -24,25 +24,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
         async session({ session, token }: { session: any, token: any }) {
             if (session.user && session.user.email) {
-                const email = session.user.email;
+                const email = session.user.email.toLowerCase();
                 let role = "GUEST";
                 let campus = null;
 
-                if (RECTORIA_EMAILS.includes(email)) {
+                console.log("AUTH DEBUG - Checking email:", email);
+                console.log("AUTH DEBUG - Rectoria list:", RECTORIA_EMAILS.map(e => e.toLowerCase()));
+
+                if (RECTORIA_EMAILS.map(e => e.toLowerCase()).includes(email)) {
                     role = "RECTOR";
+                    console.log("AUTH DEBUG - Assigned RECTOR");
                 } else {
                     for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
-                        if (data.emails_directora.includes(email)) {
+                        const directores = data.emails_directora.map(e => e.toLowerCase());
+                        const coordinadores = data.emails_coordinadores.map(e => e.toLowerCase());
+
+                        if (directores.includes(email)) {
                             role = "DIRECTORA";
                             campus = campusName;
+                            console.log(`AUTH DEBUG - Assigned DIRECTORA for ${campusName}`);
                             break;
                         }
-                        if (data.emails_coordinadores.includes(email)) {
+                        if (coordinadores.includes(email)) {
                             role = "COORDINADORA";
                             campus = campusName;
+                            console.log(`AUTH DEBUG - Assigned COORDINADORA for ${campusName}`);
                             break;
                         }
                     }
+                }
+
+                if (role === "GUEST") {
+                    console.log("AUTH DEBUG - Role remains GUEST");
                 }
 
                 session.user.role = role;

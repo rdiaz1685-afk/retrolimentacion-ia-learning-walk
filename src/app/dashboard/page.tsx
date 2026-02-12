@@ -24,6 +24,7 @@ export default async function DashboardPage() {
     }
 
     const user = session.user;
+    console.log(">>> [DASHBOARD DEBUG]", { email: user.email, role: user.role, campus: user.campus });
     let rawData = [];
 
     try {
@@ -65,7 +66,19 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between mb-8 print:hidden">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Bienvenido, {user.name}</h1>
-                    <p className="text-slate-500">Datos vinculados con nombres de maestros de todos los campus.</p>
+                    <div className="flex gap-2 mt-2">
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full uppercase tracking-wider">
+                            Rol: {user.role}
+                        </span>
+                        {user.campus && (
+                            <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full uppercase tracking-wider">
+                                Campus: {user.campus}
+                            </span>
+                        )}
+                        <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] items-center flex">
+                            {user.email}
+                        </span>
+                    </div>
                 </div>
                 <div className="flex gap-x-2">
                     <PrintReportButton />
