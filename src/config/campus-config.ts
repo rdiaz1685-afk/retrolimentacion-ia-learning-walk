@@ -71,6 +71,11 @@ export const CAMPUS_DATA = {
     }
 };
 
+export const RECTORIA_EMAILS = [
+    "ernesto.matias@cambridgemty.edu.mx",
+    "lramos@cambridgemty.edu.mx"
+];
+
 // Configuración de simulación para pruebas de visualización
 // Permite que un administrador vea el dashboard como si fuera una coordinadora específica
 export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; mockEmail?: string }> = {

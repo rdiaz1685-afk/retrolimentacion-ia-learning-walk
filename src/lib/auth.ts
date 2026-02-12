@@ -38,7 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         // encuentre a esta persona en la lista de usuarios de Google Sheets
                         session.user.email = sim.mockEmail;
                     }
-                } else if (RECTORIA_EMAILS.map(e => e.toLowerCase()).includes(email)) {
+                } else if (RECTORIA_EMAILS.map((e: any) => e.toLowerCase()).includes(email)) {
                     role = "RECTOR";
                 } else {
                     for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
