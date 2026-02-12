@@ -91,6 +91,27 @@ export async function getCampusData(campusName: string, accessToken: string) {
             getVal(c, ["nombre_aula", "nombre", "Nombre"])
         ]).filter(([id]) => id));
 
+        // Normalización de objetos para asegurar campos consistentes en la UI
+        const normalizedTeachers = teachers.map(t => ({
+            ...t,
+            id_maestro: getVal(t, ["id_maestro", "id_maestra", "ID"]),
+            id_usuario_coordinador: getVal(t, ["id_usuario_coordinador", "Coordinadora", "id_coordinador", "id_coordinadora"]),
+            nombre: getVal(t, ["nombre", "Nombre", "nombre_maestro"])
+        }));
+
+        const normalizedUsers = users.map(u => ({
+            ...u,
+            id_usuario: getVal(u, ["id_usuario", "id_coordinador", "id_coordinadora", "ID"]),
+            nombre: getVal(u, ["nombre", "Nombre", "nombre_usuario"]),
+            email: getVal(u, ["email", "Email", "Correo", "correo"])
+        }));
+
+        const normalizedClassrooms = classrooms.map(c => ({
+            ...c,
+            id_aula: getVal(c, ["id_aula", "ID"]),
+            nombre_aula: getVal(c, ["nombre_aula", "nombre", "Nombre"])
+        }));
+
         const evaluations = evaluationsRaw.map((obj: any) => {
             // Find IDs using multiple common keys
             const maestroId = getVal(obj, ["id_maestro", "Maestra", "maestra"]);
@@ -109,7 +130,12 @@ export async function getCampusData(campusName: string, accessToken: string) {
             return obj;
         });
 
-        return { evaluations, teachers, users, classrooms };
+        return {
+            evaluations,
+            teachers: normalizedTeachers,
+            users: normalizedUsers,
+            classrooms: normalizedClassrooms
+        };
     } catch (error: any) {
         if (error.code === 401 || (error.response && error.response.status === 401)) {
             console.warn(`[AUTH ERROR] Access token expired or invalid for ${campusName}.`);
