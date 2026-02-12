@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
     }
 
     let data = [];
+    let userName = user.name || "Usuario";
+
     try {
         console.log('[CHAT DEBUG] Usuario:', user.email, 'Rol:', user.role, 'Campus:', user.campus);
         if (user.role === "RECTOR") {
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest) {
                 if (currentUser) {
                     const coordinatorId = currentUser.id_usuario;
                     const coordinatorName = currentUser.nombre;
+                    userName = coordinatorName;
 
                     data = evaluations.filter((e: any) =>
                         (coordinatorId && e.id_usuario_coordinador === coordinatorId) ||
@@ -58,7 +61,12 @@ export async function POST(req: NextRequest) {
     console.log('[CHAT DEBUG] Total de datos para la IA:', data.length);
 
     const systemPrompt = generateSystemPrompt(
-        { email: user.email!, role: (user as any).role!, campus: (user as any).campus || null },
+        {
+            email: user.email!,
+            role: (user as any).role!,
+            campus: (user as any).campus || null,
+            name: userName
+        },
         data // Enviar TODAS las observaciones para análisis completo
     );
 

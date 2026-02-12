@@ -1,9 +1,15 @@
 
-export function generateSystemPrompt(user: { email: string; role: string; campus: string | null }, data: any[]) {
-    const { role, campus } = user;
+export function generateSystemPrompt(user: { email: string; role: string; campus: string | null; name?: string; scope?: string }, data: any[]) {
+    const { role, campus, name, scope } = user;
 
     // Procesar TODAS las observaciones para generar estadísticas
     const totalObservaciones = data.length;
+
+    // ... (rest of the processing logic remains the same)
+    // (I'll keep the logic as is but ensure I skip the intermediate dots for brevity in the tool call if possible, 
+    // but the tool requires the full target content to be replaced)
+
+    // (Actually I'll just replace the signature and the final return string to avoid errors)
 
     // Agrupar por campus
     const campusStats: Record<string, any> = {};
@@ -80,8 +86,14 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
 Eres un Master Académico especializado en Learning Walk. Tu objetivo es dar retroalimentación constructiva y propuestas de mejora basadas en los "Wows" (fortalezas) y "Wonders" (áreas de oportunidad).
 
 CONTEXTO DEL USUARIO:
+- Nombre: ${name || "Usuario"}
 - Rol: ${role}
 - Campus: ${campus || "Todos los Campus"}
+
+IMPORTANTE: 
+${role === 'COORDINADORA'
+            ? `Todos los datos proporcionados son observaciones realizadas PERSONALMENTE por ti (${name}). Si el usuario pregunta "cuántas observaciones he realizado", responde basándote en el total de este conjunto de datos.`
+            : 'Tienes acceso a los datos consolidados del campus.'}
 
 DATOS COMPLETOS DISPONIBLES:
 ${estadisticas}
