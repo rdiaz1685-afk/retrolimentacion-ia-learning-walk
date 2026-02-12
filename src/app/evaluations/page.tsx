@@ -16,9 +16,11 @@ export default async function EvaluationsPage() {
 
     try {
         if (user.role === "RECTOR") {
-            rawData = await getAllData(session.accessToken!);
+            const { evaluations } = await getAllData(session.accessToken!);
+            rawData = evaluations;
         } else if (user.campus) {
-            rawData = await getCampusData(user.campus, session.accessToken!);
+            const { evaluations } = await getCampusData(user.campus, session.accessToken!);
+            rawData = evaluations;
         }
     } catch (error) {
         console.error("Error loading evaluations data:", error);
