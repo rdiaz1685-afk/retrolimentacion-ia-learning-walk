@@ -7,13 +7,13 @@ const accessToken = 'TU_ACCESS_TOKEN_AQUI';
 async function diagnosticar() {
     console.log('🔍 Obteniendo todos los datos...\n');
 
-    const data = await getAllData(accessToken);
+    const { evaluations: data } = await getAllData(accessToken);
 
     console.log(`📊 Total de observaciones: ${data.length}\n`);
 
     // Agrupar por campus
     const campusStats: Record<string, any> = {};
-    data.forEach(item => {
+    data.forEach((item: any) => {
         const campusName = item.campus || 'Sin campus';
         if (!campusStats[campusName]) {
             campusStats[campusName] = {
