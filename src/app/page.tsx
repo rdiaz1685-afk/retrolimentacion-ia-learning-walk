@@ -22,6 +22,7 @@ export default async function LoginPage() {
             <GraduationCap className="w-12 h-12 text-indigo-600" />
           </div>
           <div className="text-center">
+            <span className="text-indigo-400 text-xs font-bold uppercase tracking-[0.2em] mb-1 block">Colegio Cambridge de Monterrey</span>
             <h1 className="text-3xl font-bold text-white tracking-tight">Learning Walk Feedback</h1>
             <p className="text-slate-400 mt-2">Plataforma de retroalimentación inteligente</p>
           </div>
