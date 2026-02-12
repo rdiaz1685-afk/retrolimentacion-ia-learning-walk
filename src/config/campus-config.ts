@@ -77,6 +77,10 @@ export const RECTORIA_EMAILS = [
     "rafael.diaz@cambridgemty.edu.mx"
 ];
 
+// Configuración de simulación (Desactivada por defecto)
+// Para activar, comenta la línea de abajo y descomenta el bloque de abajo.
+export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; mockEmail?: string }> = {};
+
 /*
 export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; mockEmail?: string }> = {
     "lramos@cambridgemty.edu.mx": {
