@@ -67,30 +67,44 @@ export async function getCampusData(campusName: string, accessToken: string) {
             console.warn(`Pestaña 'aulas' no encontrada en campus ${campusName}`);
         }
 
-        // Mappings for enrichment
-        const teachersMap = Object.fromEntries(teachers.map(t => [t.id_maestro, t.nombre]));
-        const usersMap = Object.fromEntries(users.map(u => [u.id_usuario, u.nombre]));
-        const classroomsMap = Object.fromEntries(classrooms.map(c => [c.id_aula, c.nombre_aula]));
+        // Helper to find a value by multiple possible keys
+        const getVal = (obj: any, keys: string[]) => {
+            for (const k of keys) {
+                if (obj[k] !== undefined && obj[k] !== null && obj[k] !== "") return obj[k];
+            }
+            return undefined;
+        };
+
+        // Mappings for enrichment with flexible keys
+        const teachersMap = Object.fromEntries(teachers.map(t => [
+            getVal(t, ["id_maestro", "id_maestra", "ID"]),
+            getVal(t, ["nombre", "Nombre", "nombre_maestro"])
+        ]).filter(([id]) => id));
+
+        const usersMap = Object.fromEntries(users.map(u => [
+            getVal(u, ["id_usuario", "id_coordinador", "id_coordinadora", "ID"]),
+            getVal(u, ["nombre", "Nombre", "nombre_usuario"])
+        ]).filter(([id]) => id));
+
+        const classroomsMap = Object.fromEntries(classrooms.map(c => [
+            getVal(c, ["id_aula", "ID"]),
+            getVal(c, ["nombre_aula", "nombre", "Nombre"])
+        ]).filter(([id]) => id));
 
         const evaluations = evaluationsRaw.map((obj: any) => {
-            // Replace ID with Name if available
-            if (obj.id_maestro && teachersMap[obj.id_maestro]) {
-                obj.nombre_maestro = teachersMap[obj.id_maestro];
-            } else {
-                obj.nombre_maestro = obj.id_maestro;
-            }
+            // Find IDs using multiple common keys
+            const maestroId = getVal(obj, ["id_maestro", "Maestra", "maestra"]);
+            const coordinadorId = getVal(obj, ["id_usuario_coordinador", "Coordinadora", "coordinadora", "id_coordinador"]);
+            const aulaId = getVal(obj, ["Aula", "id_aula", "aula"]);
 
-            if (obj.id_usuario_coordinador && usersMap[obj.id_usuario_coordinador]) {
-                obj.nombre_coordinador = usersMap[obj.id_usuario_coordinador];
-            } else {
-                obj.nombre_coordinador = obj.id_usuario_coordinador;
-            }
+            // Enrichment
+            obj.nombre_maestro = (maestroId && teachersMap[maestroId]) || maestroId || "Desconocida";
+            obj.nombre_coordinador = (coordinadorId && usersMap[coordinadorId]) || coordinadorId || "Desconocida";
+            obj.nombre_aula = (aulaId && classroomsMap[aulaId]) || aulaId || "Desconocida";
 
-            if (obj.Aula && classroomsMap[obj.Aula]) {
-                obj.nombre_aula = classroomsMap[obj.Aula];
-            } else {
-                obj.nombre_aula = obj.Aula;
-            }
+            // Ensure these keys exist for consistent access in UI
+            obj.id_maestro = maestroId;
+            obj.id_usuario_coordinador = coordinadorId;
 
             return obj;
         });
