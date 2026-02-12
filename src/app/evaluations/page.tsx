@@ -25,7 +25,13 @@ export default async function EvaluationsPage() {
                 const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
                 if (currentUser) {
                     const coordinatorId = currentUser.id_usuario;
-                    rawData = evaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
+                    const coordinatorName = currentUser.nombre;
+
+                    rawData = evaluations.filter((e: any) =>
+                        (coordinatorId && e.id_usuario_coordinador === coordinatorId) ||
+                        (coordinatorName && e.id_usuario_coordinador === coordinatorName) ||
+                        (coordinatorName && e.nombre_coordinador === coordinatorName)
+                    );
                 } else {
                     rawData = evaluations;
                 }

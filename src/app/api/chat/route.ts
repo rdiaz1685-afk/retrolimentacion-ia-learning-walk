@@ -34,8 +34,14 @@ export async function POST(req: NextRequest) {
                 const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
                 if (currentUser) {
                     const coordinatorId = currentUser.id_usuario;
-                    data = evaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
-                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorId}. Datos:`, data.length);
+                    const coordinatorName = currentUser.nombre;
+
+                    data = evaluations.filter((e: any) =>
+                        (coordinatorId && e.id_usuario_coordinador === coordinatorId) ||
+                        (coordinatorName && e.id_usuario_coordinador === coordinatorName) ||
+                        (coordinatorName && e.nombre_coordinador === coordinatorName)
+                    );
+                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorName} (ID: ${coordinatorId}). Datos:`, data.length);
                 } else {
                     data = evaluations;
                 }
