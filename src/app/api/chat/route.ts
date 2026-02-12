@@ -28,9 +28,20 @@ export async function POST(req: NextRequest) {
             data = evaluations;
             console.log('[CHAT DEBUG] Datos obtenidos:', data.length, 'observaciones');
         } else if (user.campus) {
-            const { evaluations } = await getCampusData(user.campus, session.accessToken!);
-            data = evaluations;
-            console.log('[CHAT DEBUG] Datos obtenidos:', data.length, 'observaciones');
+            const { evaluations, users } = await getCampusData(user.campus, session.accessToken!);
+
+            if (user.role === "COORDINADORA" && user.email) {
+                const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+                if (currentUser) {
+                    const coordinatorId = currentUser.id_usuario;
+                    data = evaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
+                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorId}. Datos:`, data.length);
+                } else {
+                    data = evaluations;
+                }
+            } else {
+                data = evaluations;
+            }
         }
     } catch (e) {
         console.error('[CHAT ERROR] Error al obtener datos de Google Sheets:', e);

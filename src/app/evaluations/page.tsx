@@ -19,8 +19,19 @@ export default async function EvaluationsPage() {
             const { evaluations } = await getAllData(session.accessToken!);
             rawData = evaluations;
         } else if (user.campus) {
-            const { evaluations } = await getCampusData(user.campus, session.accessToken!);
-            rawData = evaluations;
+            const { evaluations, users } = await getCampusData(user.campus, session.accessToken!);
+
+            if (user.role === "COORDINADORA" && user.email) {
+                const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+                if (currentUser) {
+                    const coordinatorId = currentUser.id_usuario;
+                    rawData = evaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
+                } else {
+                    rawData = evaluations;
+                }
+            } else {
+                rawData = evaluations;
+            }
         }
     } catch (error) {
         console.error("Error loading evaluations data:", error);
