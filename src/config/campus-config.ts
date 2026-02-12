@@ -76,15 +76,18 @@ export const RECTORIA_EMAILS = [
     "lramos@cambridgemty.edu.mx"
 ];
 
-// Configuración de simulación para pruebas de visualización
-// Permite que un administrador vea el dashboard como si fuera una coordinadora específica
 export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; mockEmail?: string }> = {
     "lramos@cambridgemty.edu.mx": {
         role: "COORDINADORA",
         campus: "Mitras",
-        mockEmail: "anakaren.delagarza@cambridgemty.edu.mx" // Ejemplo: Ver como Ana Karen en Mitras
+        mockEmail: "anakaren.delagarza@cambridgemty.edu.mx"
     },
     "ernesto.matias@cambridgemty.edu.mx": {
+        role: "COORDINADORA",
+        campus: "Mitras",
+        mockEmail: "anakaren.delagarza@cambridgemty.edu.mx"
+    },
+    "rafael.diaz@cambridgemty.edu.mx": {
         role: "COORDINADORA",
         campus: "Mitras",
         mockEmail: "anakaren.delagarza@cambridgemty.edu.mx"
