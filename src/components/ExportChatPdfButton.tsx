@@ -44,7 +44,12 @@ export function ExportChatPdfButton({ messages }: ExportChatPdfButtonProps) {
         messages.forEach((msg) => {
             const isUser = msg.role === "user";
 
-            // Role label
+            // Role label - Check if there's space for at least the label
+            if (y > doc.internal.pageSize.getHeight() - margin - 15) {
+                doc.addPage();
+                y = 30;
+            }
+
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
             doc.setTextColor(isUser ? 79 : 100);
@@ -59,17 +64,23 @@ export function ExportChatPdfButton({ messages }: ExportChatPdfButtonProps) {
 
             const lines = doc.splitTextToSize(msg.content, maxLineWidth);
 
-            // Check for page overflow
-            if (y + (lines.length * 6) > doc.internal.pageSize.getHeight() - margin) {
-                doc.addPage();
-                y = 30;
-            }
+            lines.forEach((line: string) => {
+                if (y > doc.internal.pageSize.getHeight() - margin - 10) {
+                    doc.addPage();
+                    y = 30;
+                    // Re-set styles on new page
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(11);
+                    doc.setTextColor(30, 41, 59);
+                }
+                doc.text(line, margin, y);
+                y += 6;
+            });
 
-            doc.text(lines, margin, y);
-            y += (lines.length * 6) + 15;
+            y += 10; // Space between messages
 
             // Separator line
-            if (y < doc.internal.pageSize.getHeight() - 20) {
+            if (y < doc.internal.pageSize.getHeight() - margin - 5) {
                 doc.setDrawColor(241, 245, 249);
                 doc.line(margin, y - 5, pageWidth - margin, y - 5);
             }
