@@ -74,9 +74,9 @@ export const CAMPUS_DATA = {
 export const RECTORIA_EMAILS = [
     "ernesto.matias@cambridgemty.edu.mx",
     "lramos@cambridgemty.edu.mx",
-    "rafael.diaz@cambridgemty.edu.mx",
-    "my.email@cambridgemty.edu.mx"
+    "rafael.diaz@cambridgemty.edu.mx"
 ];
+
 /*
 export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; mockEmail?: string }> = {
     "lramos@cambridgemty.edu.mx": {
@@ -96,5 +96,5 @@ export const SIMULATION_CONFIG: Record<string, { role: string; campus: string; m
     }
 };
 */
-*/
+
 export const SHEET_NAME = "evaluaciones";
