@@ -93,17 +93,17 @@ export default async function DashboardPage() {
     ];
 
     return (
-        <div className="p-8">
+        <div className="p-4 md:p-8">
             {/* Header exclusivo para impresión (oculto en pantalla) */}
             <div className="hidden print:block mb-8 border-b pb-4 print-header-only">
                 <h1 className="text-2xl font-bold text-slate-900">Reporte de Desempeño - Learning Walk</h1>
                 <p className="text-slate-600">Generado por: {user.name} • Fecha: {new Date().toLocaleDateString()}</p>
             </div>
 
-            <div className="flex items-center justify-between mb-8 print:hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-4 mb-8 print:hidden">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Bienvenido, {user.name}</h1>
-                    <p className="text-slate-500">
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Bienvenido, {user.name}</h1>
+                    <p className="text-sm md:text-base text-slate-500">
                         {user.role === "RECTOR"
                             ? "Reporte consolidado de todos los campus."
                             : `Panel de control - Campus ${user.campus}`}

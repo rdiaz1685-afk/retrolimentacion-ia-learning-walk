@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { auth } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
+import { MobileNavbar } from "@/components/MobileNavbar";
 import { redirect } from "next/navigation";
 
 const geistSans = Geist({
@@ -36,7 +37,8 @@ export default async function RootLayout({
             <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80] bg-gray-900 overflow-y-auto">
               <Sidebar user={session.user} />
             </div>
-            <main className="md:pl-72 bg-slate-50 min-h-screen">
+            <MobileNavbar user={session.user} />
+            <main className="md:pl-72 bg-slate-50 min-h-screen pt-16 md:pt-0">
               {children}
             </main>
           </div>

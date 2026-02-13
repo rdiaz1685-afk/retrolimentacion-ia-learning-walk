@@ -42,18 +42,18 @@ export default function ChatPage() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-2rem)] p-4 md:p-8">
-            <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-2rem)] p-4 md:p-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-y-4 mb-4 md:mb-8">
                 <div className="flex items-center gap-x-3">
-                    <div className="p-2 bg-pink-100 rounded-lg">
+                    <div className="p-2 bg-pink-100 rounded-lg shrink-0">
                         <Sparkles className="h-6 w-6 text-pink-600" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Asistente Master Academic</h1>
-                        <p className="text-sm text-slate-500">Consulta tendencias, propuestas de mejora y análisis de tu campus.</p>
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 leading-tight">Asistente Master Academic</h1>
+                        <p className="text-xs md:text-sm text-slate-500">Consulta tendencias y análisis de tu campus.</p>
                     </div>
                 </div>
-                <div className="hidden md:block">
+                <div className="flex w-full sm:w-auto justify-end">
                     <ExportChatPdfButton messages={messages} />
                 </div>
             </div>

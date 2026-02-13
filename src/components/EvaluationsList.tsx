@@ -32,10 +32,10 @@ export function EvaluationsList({ data }: { data: Evaluation[] }) {
 
     return (
         <>
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-4 mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Listado de Observaciones</h1>
-                    <p className="text-slate-500">Consulta el detalle de los "Wows" y "Wonders" reales de tu campus.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Listado de Observaciones</h1>
+                    <p className="text-sm text-slate-500">Consulta el detalle de los "Wows" y "Wonders".</p>
                 </div>
                 <div className="flex gap-x-3">
                     <ExportPdfButton data={filteredData} />
@@ -43,11 +43,11 @@ export function EvaluationsList({ data }: { data: Evaluation[] }) {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <div className="relative w-64 md:w-96">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-y-4 items-center justify-between bg-slate-50/50">
+                    <div className="relative w-full sm:w-64 md:w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                         <input
-                            placeholder="Buscar maestra, coordinadora o campus..."
+                            placeholder="Buscar..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2 border border-slate-400 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-indigo-500 transition placeholder:text-slate-400 font-medium"
@@ -55,7 +55,7 @@ export function EvaluationsList({ data }: { data: Evaluation[] }) {
                     </div>
                     <div className="flex items-center gap-x-2 text-xs text-slate-500">
                         <Info className="h-4 w-4" />
-                        <span>Mostrando {filteredData.length} registros reales</span>
+                        <span>{filteredData.length} registros</span>
                     </div>
                 </div>
 
