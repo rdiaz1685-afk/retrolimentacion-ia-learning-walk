@@ -11,54 +11,50 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
 
     // (Actually I'll just replace the signature and the final return string to avoid errors)
 
-    // Agrupar por campus
+    // Función para determinar el nivel basado en el nombre del aula (segundo carácter)
+    const getNivel = (nombreAula: string) => {
+        if (!nombreAula || nombreAula.length < 2) return 'Desconocido';
+        const car = nombreAula.charAt(1).toUpperCase();
+        switch (car) {
+            case 'K': return 'Preescolar';
+            case 'N': return 'Prenursery';
+            case 'D': return 'Toddlers';
+            case 'P': return 'Primaria';
+            case 'S': return 'Secundaria';
+            default: return 'Otro';
+        }
+    };
+
+    // Agrupar por campus y nivel
     const campusStats: Record<string, any> = {};
+    const nivelStats: Record<string, any> = {};
+
     data.forEach(item => {
         const campusName = item.campus || 'Sin campus';
+        const nivel = getNivel(item.nombre_aula);
+
+        // Stats por Campus
         if (!campusStats[campusName]) {
-            campusStats[campusName] = {
-                total: 0,
-                wows: 0,
-                wonders: 0,
-                maestros: new Set(),
-                wowsTextos: [],
-                wondersTextos: []
-            };
+            campusStats[campusName] = { total: 0, wows: 0, wonders: 0, maestros: new Set() };
         }
         campusStats[campusName].total++;
         campusStats[campusName].maestros.add(item.nombre_maestro || item.id_maestro);
 
-        // DEBUG: Log para ver qué está pasando con los Wows
+        // Stats por Nivel
+        if (!nivelStats[nivel]) {
+            nivelStats[nivel] = { total: 0, wows: 0, wonders: 0 };
+        }
+        nivelStats[nivel].total++;
+
         if (item.WOWS_Texto) {
-            console.log(`[DEBUG] Campus: ${campusName}, Wow encontrado:`, item.WOWS_Texto.substring(0, 50));
             campusStats[campusName].wows++;
-            campusStats[campusName].wowsTextos.push({
-                maestra: item.nombre_maestro || item.id_maestro,
-                texto: item.WOWS_Texto,
-                fecha: item.fecha
-            });
+            nivelStats[nivel].wows++;
         }
         if (item.WONDERS_Texto) {
             campusStats[campusName].wonders++;
-            campusStats[campusName].wondersTextos.push({
-                maestra: item.nombre_maestro || item.id_maestro,
-                texto: item.WONDERS_Texto,
-                fecha: item.fecha
-            });
+            nivelStats[nivel].wonders++;
         }
     });
-
-    // DEBUG: Mostrar estadísticas finales
-    console.log('[DEBUG] Estadísticas por campus:', JSON.stringify(
-        Object.keys(campusStats).map(c => ({
-            campus: c,
-            total: campusStats[c].total,
-            wows: campusStats[c].wows,
-            wonders: campusStats[c].wonders
-        })),
-        null,
-        2
-    ));
 
     // Convertir Sets a arrays y contar
     Object.keys(campusStats).forEach(c => {
@@ -70,6 +66,8 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
     const recentObservations = data.slice(-100).map(item => ({
         maestra: item.nombre_maestro || item.id_maestro,
         campus: item.campus,
+        nivel: getNivel(item.nombre_aula),
+        aula: item.nombre_aula,
         fecha: item.fecha,
         semana: item.semana,
         wow: item.WOWS_Texto,
@@ -79,31 +77,36 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
     const estadisticas = JSON.stringify({
         totalObservaciones,
         campusStats,
+        nivelStats,
         observacionesRecientes: recentObservations
     });
 
     return `
 Eres un Master Académico especializado en Learning Walk. Tu objetivo es dar retroalimentación constructiva y propuestas de mejora basadas en los "Wows" (fortalezas) y "Wonders" (áreas de oportunidad).
 
+LOGICA DE NIVELES (CRÍTICO):
+Hemos definido el nivel educativo basado en el segundo carácter del nombre del aula:
+- 'K' = Preescolar (Kinder)
+- 'N' = Prenursery
+- 'D' = Toddlers
+- 'P' = Primaria
+- 'S' = Secundaria
+
+Ejemplo: El aula "1KACU" pertenece al nivel Preescolar porque su segundo carácter es 'K'.
+
 CONTEXTO DEL USUARIO:
 - Nombre: ${name || "Usuario"}
 - Rol: ${role}
 - Campus: ${campus || "Todos los Campus"}
 
-IMPORTANTE: 
-${role === 'COORDINADORA'
-            ? `Todos los datos proporcionados son observaciones realizadas PERSONALMENTE por ti (${name}). Si el usuario pregunta "cuántas observaciones he realizado", responde basándote en el total de este conjunto de datos.`
-            : 'Tienes acceso a los datos consolidados del campus.'}
-
-DATOS COMPLETOS DISPONIBLES:
+DATOS COMPLETOS DISPONIBLES (Estadísticas por campus, nivel y detalle reciente):
 ${estadisticas}
 
 REGLAS:
-1. Analiza TODAS las observaciones disponibles, no solo las recientes.
-2. Si eres Rector, compara fortalezas y áreas de oportunidad entre campus.
-3. Identifica patrones recurrentes en los "Wonders" para sugerir estrategias pedagógicas concretas.
+1. Analiza TODAS las observaciones disponibles. Si te piden datos de un "nivel" específico (ej. Preescolar), usa la lógica del segundo carácter del aula para filtrar y responder.
+2. Si eres Rector, compara fortalezas y áreas de oportunidad entre campus y niveles.
+3. Identifica patrones recurrentes en los "Wonders" para sugerir estrategias pedagógicas concretas según el nivel (no es lo mismo una estrategia para Toddlers que para Secundaria).
 4. Menciona maestros por sus nombres reales cuando sea relevante.
 5. Mantén un tono profesional y de mentoría académica.
-6. Sé específico y basado en datos: menciona números y porcentajes cuando sea útil.
-`;
+ `;
 }
