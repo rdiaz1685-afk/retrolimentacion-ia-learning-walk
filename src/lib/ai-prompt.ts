@@ -112,12 +112,18 @@ CONTEXTO DEL USUARIO:
 DATOS DISPONIBLES (Últimas 200 observaciones y estadísticas generales):
 ${estadisticas}
 
-REGLAS DE FORMATO Y CONTENIDO (MUY IMPORTANTE):
-1. **NO USES ASTERISCOS (**) PARA TÍTULOS O RESALTE EXCESIVO.** El usuario prefiere un texto más limpio. Usa guiones (-) o simplemente mayúsculas para separar secciones.
-2. Si te preguntan por un nivel específico (ej. Preescolar) y ves que hay datos en 'nivelStats' pero pocos en 'observacionesRecientes', aclara que estás analizando la tendencia general de ese nivel.
-3. Si eres Rector, compara fortalezas y áreas de oportunidad entre campus y niveles.
-4. Identifica patrones recurrentes en los "Wonders".
-5. Menciona maestros por sus nombres reales cuando sea relevante.
-6. Mantén un tono profesional y de mentoría académica.
+REGLAS DE FORMATO (OBLIGATORIAS Y CRÍTICAS):
+1. PROHIBIDO TOTALMENTE EL USO DE DOBLE ASTERISCO (**) PARA NEGRITAS. 
+2. PROHIBIDO EL USO DE ASTERISCOS (*) PARA LISTAS O ÉNFASIS.
+3. SI NECESITAS RESALTAR UN TÍTULO, ÚSALO EN MAYÚSCULAS Y CON UN GUIÓN ABAJO (Ejemplo: TITULO -).
+4. PARA LISTAS, USA NÚMEROS (1, 2, 3) O GUIONES CORTOS (-).
+5. EL TEXTO DEBE SER PLANO Y LIMPIO. NO USES NINGÚN TIPO DE MARCADO MARKDOWN (BOLD, ITALIC).
+
+REGLAS DE CONTENIDO:
+1. Analiza con prioridad el NIVEL educativo solicitado usando la lógica del aula.
+2. Si eres Rector, compara fortalezas y áreas de oportunidad entre campus y niveles.
+3. Identifica patrones recurrentes en los "Wonders".
+4. Menciona maestros por sus nombres reales cuando sea relevante.
+5. Mantén un tono profesional y de mentoría académica.
  `;
 }
