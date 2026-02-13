@@ -73,8 +73,10 @@ export const CAMPUS_DATA = {
 
 export const RECTORIA_EMAILS = [
     "ernesto.matias@cambridgemty.edu.mx",
+    "roberta.fernandez@cambridgemty.edu.mx",
     "lramos@cambridgemty.edu.mx",
-    "rafael.diaz@cambridgemty.edu.mx"
+    "rafael.diaz@cambridgemty.edu.mx",
+    "antonio.turati@cambridgemty.edu.mx"
 ];
 
 // Configuración de simulación (Desactivada por defecto)
