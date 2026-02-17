@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, Sparkles } from "lucide-react";
+import { Send, Bot, User, Loader2, Sparkles, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { ExportChatPdfButton } from "@/components/ExportChatPdfButton";
@@ -93,14 +93,36 @@ export default function ChatPage() {
                 </div>
 
                 <div className="p-4 border-t border-slate-100 bg-white/50 backdrop-blur-md">
-                    <form onSubmit={onSubmit} className="flex gap-x-4">
-                        <input
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Pregunta sobre tendencias o ideas de mejora..."
-                            className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                            disabled={isLoading}
-                        />
+                    <form onSubmit={onSubmit} className="flex gap-x-2">
+                        <div className="flex-1 relative flex items-center">
+                            <input
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Pregunta sobre tendencias o escribe 'Analiza este archivo' al subir un JSON..."
+                                className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-12 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                disabled={isLoading}
+                            />
+
+                            <label className="absolute right-2 p-2 text-slate-400 hover:text-indigo-600 cursor-pointer transition-colors" title="Subir archivo JSON para análisis">
+                                <Paperclip className="h-5 w-5" />
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                                const content = event.target?.result as string;
+                                                setInput(`Analiza estos datos cargados: \n${content}\n\nMi pregunta es: `);
+                                            };
+                                            reader.readAsText(file);
+                                        }
+                                    }}
+                                />
+                            </label>
+                        </div>
                         <button
                             type="submit"
                             disabled={isLoading || !input.trim()}
