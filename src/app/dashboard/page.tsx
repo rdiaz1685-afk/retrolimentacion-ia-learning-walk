@@ -142,7 +142,7 @@ export default async function DashboardPage() {
                 initialData={data}
                 allTeachers={teachers}
                 availableCampuses={availableCampuses}
-                userRole={user.role}
+                userRole={user.role || ""}
             />
         </div>
     );
