@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Info, MapPin, User, Filter } from "lucide-react";
+import { Search, Info, MapPin, User, FileJson, CheckSquare, Square, Trash2 } from "lucide-react";
 import { ObservationAction } from "@/components/ObservationAction";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 
@@ -37,7 +36,9 @@ export function EvaluationsList({
     const [selectedCampus, setSelectedCampus] = useState("all");
     const [selectedTeacher, setSelectedTeacher] = useState("all");
 
-    // Filter teachers based on selected campus
+    // Multi-selection state
+    const [selectedObservations, setSelectedObservations] = useState<Evaluation[]>([]);
+
     const filteredTeachersList = useMemo(() => {
         if (selectedCampus === "all") return allTeachers;
         return allTeachers.filter(t => t.campus === selectedCampus);
@@ -66,22 +67,65 @@ export function EvaluationsList({
         setSelectedTeacher("all");
     };
 
+    // Selection logic
+    const toggleSelection = (obs: Evaluation) => {
+        const isSelected = selectedObservations.some(o => o.fecha === obs.fecha && o.maestra === obs.maestra);
+        if (isSelected) {
+            setSelectedObservations(prev => prev.filter(o => !(o.fecha === obs.fecha && o.maestra === obs.maestra)));
+        } else {
+            setSelectedObservations(prev => [...prev, obs]);
+        }
+    };
+
+    const clearSelection = () => setSelectedObservations([]);
+
+    const exportToJson = () => {
+        const dataStr = JSON.stringify(selectedObservations, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        const exportFileDefaultName = `analisis-comparativo-${new Date().toISOString().slice(0, 10)}.json`;
+
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    };
+
     return (
         <>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-4 mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-y-4 mb-8">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Listado de Observaciones</h1>
-                    <p className="text-sm text-slate-500">Consulta el detalle de los "Wows" y "Wonders".</p>
+                    <p className="text-sm text-slate-500">Filtrado inteligente y exportación para IA.</p>
                 </div>
-                <div className="flex gap-x-3">
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {selectedObservations.length > 0 && (
+                        <div className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl shadow-md animate-in fade-in slide-in-from-right-4">
+                            <span className="text-xs font-bold">{selectedObservations.length} seleccionadas</span>
+                            <div className="w-[1px] h-4 bg-indigo-400 mx-1"></div>
+                            <button
+                                onClick={exportToJson}
+                                className="hover:text-indigo-200 transition-colors flex items-center gap-1 text-xs font-bold"
+                                title="Exportar JSON para chat IA"
+                            >
+                                <FileJson className="h-4 w-4" /> Exportar para IA
+                            </button>
+                            <button
+                                onClick={clearSelection}
+                                className="hover:text-red-200 transition-colors p-1"
+                                title="Limpiar selección"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </div>
+                    )}
                     <ExportPdfButton data={filteredData} />
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-12">
                 <div className="p-6 border-b border-slate-100 flex flex-wrap gap-4 items-end justify-between bg-slate-50/50">
                     <div className="flex flex-wrap gap-4 items-end flex-grow">
-                        {/* Search Bar */}
                         <div className="relative w-full md:w-80">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Búsqueda rápida</label>
                             <div className="relative">
@@ -95,7 +139,6 @@ export function EvaluationsList({
                             </div>
                         </div>
 
-                        {/* Campus Filter */}
                         <div className="w-full sm:w-48">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Campus</label>
                             <div className="relative">
@@ -113,7 +156,6 @@ export function EvaluationsList({
                             </div>
                         </div>
 
-                        {/* Teacher Filter */}
                         <div className="w-full sm:w-64">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Maestro(a)</label>
                             <div className="relative">
@@ -147,6 +189,9 @@ export function EvaluationsList({
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 text-slate-600 text-xs uppercase tracking-wider">
+                                <th className="px-6 py-4 font-bold text-center w-12">
+                                    <CheckSquare className="h-4 w-4 mx-auto text-slate-300" />
+                                </th>
                                 <th className="px-6 py-4 font-bold">Maestra / Coordinadora</th>
                                 <th className="px-6 py-4 font-bold">Campus / Aula</th>
                                 <th className="px-6 py-4 font-bold">Wows & Wonders</th>
@@ -156,40 +201,51 @@ export function EvaluationsList({
                         <tbody className="divide-y divide-slate-100">
                             {filteredData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                                        {searchTerm ? "No se encontraron resultados para tu búsqueda." : "No hay datos reales para mostrar. Verifica los permisos de las hojas."}
+                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                                        {searchTerm ? "No se encontraron resultados." : "No hay datos para mostrar."}
                                     </td>
                                 </tr>
                             ) : (
-                                filteredData.map((obs, i) => (
-                                    <tr key={i} className="hover:bg-slate-50/50 transition truncate">
-                                        <td className="px-6 py-4">
-                                            <div className="font-semibold text-slate-900">{obs.maestra}</div>
-                                            <div className="text-xs text-slate-400">{obs.coordinadora}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="mb-1">
-                                                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-bold uppercase tracking-tight">
-                                                    {obs.campus}
-                                                </span>
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 font-medium uppercase">Aula: {obs.aula || "N/A"}</div>
-                                        </td>
-                                        <td className="px-6 py-4 max-w-md">
-                                            <div className="mb-2">
-                                                <span className="text-[10px] font-bold text-yellow-600 mr-2 uppercase">Wow:</span>
-                                                <span className="text-sm text-slate-600 line-clamp-1 italic">"{obs.wows}"</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-[10px] font-bold text-purple-600 mr-2 uppercase">Wonder:</span>
-                                                <span className="text-sm text-slate-600 line-clamp-1 italic">"{obs.wonders}"</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <ObservationAction observation={obs} />
-                                        </td>
-                                    </tr>
-                                ))
+                                filteredData.map((obs, i) => {
+                                    const isSelected = selectedObservations.some(o => o.fecha === obs.fecha && o.maestra === obs.maestra);
+                                    return (
+                                        <tr key={i} className={`group transition ${isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/50'}`}>
+                                            <td className="px-6 py-4 text-center">
+                                                <button
+                                                    onClick={() => toggleSelection(obs)}
+                                                    className={`transition-colors ${isSelected ? 'text-indigo-600' : 'text-slate-300 group-hover:text-slate-400'}`}
+                                                >
+                                                    {isSelected ? <CheckSquare className="h-5 w-5" /> : <Square className="h-5 w-5" />}
+                                                </button>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-semibold text-slate-900">{obs.maestra}</div>
+                                                <div className="text-xs text-slate-400">{obs.coordinadora}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="mb-1">
+                                                    <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                                                        {obs.campus}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium uppercase">Aula: {obs.aula || "N/A"}</div>
+                                            </td>
+                                            <td className="px-6 py-4 max-w-md">
+                                                <div className="mb-2">
+                                                    <span className="text-[10px] font-bold text-yellow-600 mr-2 uppercase">Wow:</span>
+                                                    <span className="text-sm text-slate-600 line-clamp-1 italic">"{obs.wows}"</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-purple-600 mr-2 uppercase">Wonder:</span>
+                                                    <span className="text-sm text-slate-600 line-clamp-1 italic">"{obs.wonders}"</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <ObservationAction observation={obs} />
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
