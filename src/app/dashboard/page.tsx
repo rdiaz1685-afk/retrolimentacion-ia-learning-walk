@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 
 import { PrintReportButton } from "@/components/PrintReportButton";
+import { DashboardEvaluationsList } from "@/components/DashboardEvaluationsList";
+import { CAMPUS_DATA } from "@/config/campus-config";
 
 export default async function DashboardPage() {
     const session = await auth();
@@ -77,12 +79,16 @@ export default async function DashboardPage() {
     // Map real data to UI fields
     const data = filteredEvaluations.map((item: any) => ({
         maestra: item.nombre_maestro || item.id_maestro || "Maestra no especificada",
+        id_maestro: item.id_maestro,
         coordinadora: item.nombre_coordinador || item.id_usuario_coordinador || "Coordinadora",
         campus: item.campus || user.campus,
         wows: item.WOWS_Texto || "",
         wonders: item.WONDERS_Texto || "",
-        fecha: item.fecha || ""
+        fecha: item.fecha || "",
+        semana: item.semana
     }));
+
+    const availableCampuses = Object.keys(CAMPUS_DATA);
 
     // Statistics calculation based on real data
     const stats = [
@@ -132,41 +138,12 @@ export default async function DashboardPage() {
                 <DashboardCharts data={data} role={user.role} progressData={progressData} />
             </div>
 
-            <div className="grid grid-cols-1 gap-8 mt-8 print:hidden">
-                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6">Observaciones Semana Actual (Nombres Reales)</h2>
-                    <div className="space-y-4">
-                        {(() => {
-                            // Filter logic for current week
-                            const maxWeek = rawEvaluations.reduce((max: number, item: any) => {
-                                const w = parseInt(item.semana);
-                                return !isNaN(w) && w > max ? w : max;
-                            }, 0);
-
-                            const currentWeekData = maxWeek > 0
-                                ? data.filter((_: any, idx: number) => parseInt(filteredEvaluations[idx]?.semana) === maxWeek)
-                                : data.slice().reverse().slice(0, 20);
-
-                            const displayData = maxWeek > 0 ? currentWeekData.reverse() : currentWeekData;
-
-                            if (displayData.length === 0) {
-                                return <p className="text-slate-500 text-center py-8">No se encontraron datos para la semana actual.</p>;
-                            }
-
-                            return displayData.map((obs: any, i: number) => (
-                                <DashboardObservationItem
-                                    key={i}
-                                    maestra={obs.maestra}
-                                    campus={obs.campus}
-                                    fecha={obs.fecha}
-                                    wowText={obs.wows}
-                                    wonderText={obs.wonders}
-                                />
-                            ));
-                        })()}
-                    </div>
-                </div>
-            </div>
+            <DashboardEvaluationsList
+                initialData={data}
+                allTeachers={teachers}
+                availableCampuses={availableCampuses}
+                userRole={user.role}
+            />
         </div>
     );
 }

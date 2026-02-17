@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState } from "react";
-import { Search, Download, Info } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Info, MapPin, User, Filter } from "lucide-react";
 import { ObservationAction } from "@/components/ObservationAction";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 
 interface Evaluation {
     maestra: string;
+    id_maestro?: string;
     coordinadora: string;
     campus: string;
     aula: string;
@@ -17,18 +18,53 @@ interface Evaluation {
     objetivo: string;
 }
 
-export function EvaluationsList({ data }: { data: Evaluation[] }) {
-    const [searchTerm, setSearchTerm] = useState("");
+interface Teacher {
+    id_maestro: string;
+    nombre: string;
+    campus?: string;
+}
 
-    const filteredData = data.filter(obs => {
-        const term = searchTerm.toLowerCase();
-        return (
-            obs.maestra.toLowerCase().includes(term) ||
-            obs.coordinadora.toLowerCase().includes(term) ||
-            obs.campus.toLowerCase().includes(term) ||
-            (obs.aula && obs.aula.toLowerCase().includes(term))
-        );
-    });
+export function EvaluationsList({
+    data,
+    allTeachers = [],
+    availableCampuses = []
+}: {
+    data: Evaluation[],
+    allTeachers?: Teacher[],
+    availableCampuses?: string[]
+}) {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCampus, setSelectedCampus] = useState("all");
+    const [selectedTeacher, setSelectedTeacher] = useState("all");
+
+    // Filter teachers based on selected campus
+    const filteredTeachersList = useMemo(() => {
+        if (selectedCampus === "all") return allTeachers;
+        return allTeachers.filter(t => t.campus === selectedCampus);
+    }, [allTeachers, selectedCampus]);
+
+    const filteredData = useMemo(() => {
+        return data.filter(obs => {
+            const matchesSearch = searchTerm === "" ||
+                obs.maestra.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                obs.coordinadora.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                obs.campus.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (obs.aula && obs.aula.toLowerCase().includes(searchTerm.toLowerCase()));
+
+            const matchesCampus = selectedCampus === "all" || obs.campus === selectedCampus;
+
+            const matchesTeacher = selectedTeacher === "all" ||
+                obs.maestra === selectedTeacher ||
+                obs.id_maestro === selectedTeacher;
+
+            return matchesSearch && matchesCampus && matchesTeacher;
+        });
+    }, [data, searchTerm, selectedCampus, selectedTeacher]);
+
+    const handleCampusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setSelectedCampus(e.target.value);
+        setSelectedTeacher("all");
+    };
 
     return (
         <>
@@ -43,17 +79,65 @@ export function EvaluationsList({ data }: { data: Evaluation[] }) {
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-y-4 items-center justify-between bg-slate-50/50">
-                    <div className="relative w-full sm:w-64 md:w-96">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <input
-                            placeholder="Buscar..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-400 rounded-lg text-sm text-black focus:outline-none focus:ring-2 focus:ring-indigo-500 transition placeholder:text-slate-400 font-medium"
-                        />
+                <div className="p-6 border-b border-slate-100 flex flex-wrap gap-4 items-end justify-between bg-slate-50/50">
+                    <div className="flex flex-wrap gap-4 items-end flex-grow">
+                        {/* Search Bar */}
+                        <div className="relative w-full md:w-80">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Búsqueda rápida</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <input
+                                    placeholder="Nombre, coordinación, aula..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Campus Filter */}
+                        <div className="w-full sm:w-48">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Campus</label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                                <select
+                                    value={selectedCampus}
+                                    onChange={handleCampusChange}
+                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
+                                >
+                                    <option value="all">Todos los Campus</option>
+                                    {availableCampuses.map(campus => (
+                                        <option key={campus} value={campus}>{campus}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Teacher Filter */}
+                        <div className="w-full sm:w-64">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Maestro(a)</label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                                <select
+                                    value={selectedTeacher}
+                                    onChange={(e) => setSelectedTeacher(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
+                                >
+                                    <option value="all">Todos los Maestros</option>
+                                    {filteredTeachersList
+                                        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""))
+                                        .map(teacher => (
+                                            <option key={teacher.id_maestro} value={teacher.nombre}>
+                                                {teacher.nombre}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-x-2 text-xs text-slate-500">
+
+                    <div className="flex items-center gap-x-2 text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg">
                         <Info className="h-4 w-4" />
                         <span>{filteredData.length} registros</span>
                     </div>
