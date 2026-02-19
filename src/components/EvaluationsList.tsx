@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Info, MapPin, User, FileJson, CheckSquare, Square, Trash2 } from "lucide-react";
+import { Search, Info, MapPin, User, FileJson, CheckSquare, Square, Trash2, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { ObservationAction } from "@/components/ObservationAction";
 import { ExportPdfButton } from "@/components/ExportPdfButton";
 
@@ -199,10 +200,30 @@ export function EvaluationsList({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredData.length === 0 ? (
+                            {data.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-20 text-center">
+                                        <div className="flex flex-col items-center max-w-sm mx-auto">
+                                            <div className="bg-amber-50 p-4 rounded-full mb-4">
+                                                <Info className="h-8 w-8 text-amber-500" />
+                                            </div>
+                                            <h3 className="text-lg font-bold text-slate-800 mb-2">No se encontraron registros</h3>
+                                            <p className="text-sm text-slate-500 mb-6">
+                                                Si sabes que hay datos pero no aparecen, es posible que tu conexión de Google haya expirado.
+                                            </p>
+                                            <button
+                                                onClick={() => signOut({ callbackUrl: "/" })}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                                            >
+                                                <LogOut className="h-4 w-4" /> Refrescar Conexión
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredData.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                                        {searchTerm ? "No se encontraron resultados." : "No hay datos para mostrar."}
+                                        No se encontraron resultados para los filtros aplicados.
                                     </td>
                                 </tr>
                             ) : (
