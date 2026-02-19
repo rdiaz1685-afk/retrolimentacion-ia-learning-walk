@@ -74,9 +74,9 @@ export async function POST(req: NextRequest) {
     const fullPrompt = `${systemPrompt}\n\nPregunta: ${lastMessage}`;
 
     const candidates = [
-        { model: "gemini-1.5-pro", version: "v1beta" },
-        { model: "gemini-2.0-flash", version: "v1beta" },
-        { model: "gemini-1.5-flash", version: "v1beta" }
+        { model: "gemini-1.5-pro-latest", version: "v1beta" },
+        { model: "gemini-1.5-flash-latest", version: "v1beta" },
+        { model: "gemini-pro", version: "v1beta" }
     ];
 
     for (const cand of candidates) {
