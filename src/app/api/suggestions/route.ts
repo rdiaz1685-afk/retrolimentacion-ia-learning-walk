@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     `;
 
     // List of models to try, prioritizing newer/faster ones that are available
-    const models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+    const models = ["gemini-1.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"];
     let lastError = null;
 
     for (const model of models) {
