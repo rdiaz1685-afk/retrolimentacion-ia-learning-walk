@@ -41,8 +41,20 @@ export function EvaluationsList({
     const [selectedObservations, setSelectedObservations] = useState<Evaluation[]>([]);
 
     const filteredTeachersList = useMemo(() => {
-        if (selectedCampus === "all") return allTeachers;
-        return allTeachers.filter(t => t.campus === selectedCampus);
+        let teachers = allTeachers;
+        if (selectedCampus !== "all") {
+            teachers = allTeachers.filter(t => t.campus === selectedCampus);
+        }
+
+        // Deduplicar maestros por ID para evitar errores de React (key duplicada)
+        const uniqueMap = new Map();
+        teachers.forEach(t => {
+            if (!uniqueMap.has(t.id_maestro)) {
+                uniqueMap.set(t.id_maestro, t);
+            }
+        });
+
+        return Array.from(uniqueMap.values());
     }, [allTeachers, selectedCampus]);
 
     const filteredData = useMemo(() => {

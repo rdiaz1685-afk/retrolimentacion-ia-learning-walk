@@ -58,7 +58,17 @@ export async function POST(req: NextRequest) {
 
 
 
+
     console.log('[CHAT DEBUG] Total de datos para la IA:', data.length);
+
+    // Detección automática de sesión expirada
+    if (data.length === 0) {
+        return NextResponse.json({
+            role: "assistant",
+            content: "⚠️ **No pude encontrar observaciones.**\n\nEsto suele suceder cuando la conexión de seguridad con Google ha expirado (dura 60 min).\n\n**Solución rápida:**\n1. Cierra sesión en el menú de la izquierda.\n2. Vuelve a entrar con tu cuenta de Google.\n\nAl hacerlo, mis permisos se refrescarán y podré ver tus datos de nuevo."
+        });
+    }
+
 
     const systemPrompt = generateSystemPrompt(
         {
@@ -74,9 +84,9 @@ export async function POST(req: NextRequest) {
     const fullPrompt = `${systemPrompt}\n\nPregunta: ${lastMessage}`;
 
     const candidates = [
-        { model: "gemini-3.1-pro-preview", version: "v1beta" },
-        { model: "gemini-2.5-pro", version: "v1beta" },
-        { model: "gemini-2.0-flash", version: "v1beta" }
+        { model: "gemini-flash-latest", version: "v1beta" },
+        { model: "gemini-2.0-flash", version: "v1beta" },
+        { model: "gemini-3.1-pro-preview", version: "v1beta" }
     ];
 
     for (const cand of candidates) {
