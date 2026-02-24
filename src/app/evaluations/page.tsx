@@ -38,9 +38,9 @@ export default async function EvaluationsPage({
     const { evaluations: rawEvaluations, teachers, users } = context;
 
     // --- LÓGICA DE SEMANAS ---
-    const allWeeks = [...new Set(rawEvaluations.map((e: any) => String(e.semana)))]
+    const allWeeks: string[] = [...new Set(rawEvaluations.map((e: any) => String(e.semana)))]
         .filter(w => w && w !== "undefined")
-        .sort((a, b) => Number(a) - Number(b));
+        .sort((a, b) => Number(a) - Number(b)) as string[];
 
     const lastWeek = allWeeks[allWeeks.length - 1] || "";
     const selectedWeek = searchParams.semana || lastWeek;
