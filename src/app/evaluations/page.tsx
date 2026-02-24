@@ -120,7 +120,7 @@ export default async function EvaluationsPage({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Evaluaciones y Cumplimiento</h1>
-                    <p className="text-sm text-slate-500">Auditoría de la <span className="font-bold text-indigo-600">Semana {selectedWeek}</span></p>
+                    <p className="text-sm text-slate-500">Auditoría de la <span className="font-bold text-indigo-600">Semana {String(selectedWeek)}</span></p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Link
@@ -129,7 +129,7 @@ export default async function EvaluationsPage({
                     >
                         <Plus className="h-4 w-4" /> Nueva Observación Extracurricular
                     </Link>
-                    <WeekSelector weeks={allWeeks} currentWeek={selectedWeek} />
+                    <WeekSelector weeks={allWeeks} currentWeek={String(selectedWeek)} />
                     <RefreshButton />
                 </div>
             </div>
@@ -138,7 +138,7 @@ export default async function EvaluationsPage({
             {(user.role === "RECTOR" || user.role === "DIRECTORA" || user.role === "COORDINADORA") && (
                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                     <ComplianceTable
-                        title={`Cumplimiento Semana ${selectedWeek}`}
+                        title={`Cumplimiento Semana ${String(selectedWeek)}`}
                         complianceData={(complianceData as any[]).filter(c => {
                             if (user.role !== "COORDINADORA") return true;
                             return c?.coordinatorName?.toLowerCase().includes(user.name?.toLowerCase() || "");
