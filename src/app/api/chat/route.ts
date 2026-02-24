@@ -25,31 +25,52 @@ export async function POST(req: NextRequest) {
 
     try {
         console.log('[CHAT DEBUG] Usuario:', user.email, 'Rol:', user.role, 'Campus:', user.campus);
-        if (user.role === "RECTOR") {
-            const { evaluations } = await getAllData(session.accessToken!);
-            data = evaluations;
-            console.log('[CHAT DEBUG] Datos obtenidos:', data.length, 'observaciones');
-        } else if (user.campus) {
-            const { evaluations, users } = await getCampusData(user.campus, session.accessToken!);
 
-            if (user.role === "COORDINADORA" && user.email) {
-                const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+        let allEvaluations: any[] = [];
+        let allUsers: any[] = [];
+
+        if (user.role === "RECTOR") {
+            const result = await getAllData(session.accessToken!);
+            allEvaluations = result.evaluations;
+            allUsers = result.users;
+            data = allEvaluations; // Rector ve todo
+            console.log('[CHAT DEBUG] Rector obteniendo todo:', data.length);
+        } else {
+            // Para otros roles, primero obtenemos los datos
+            if (user.campus === "Extracurricular" || user.role === "DIRECTORA") {
+                // Si es directora o está en extracurricular, necesitamos ver los datos de esa sede
+                // O si es Directora de Extracurricular específicamente
+                const result = await getCampusData("Extracurricular", session.accessToken!);
+                allEvaluations = result.evaluations;
+                allUsers = result.users;
+            } else if (user.campus) {
+                const result = await getCampusData(user.campus, session.accessToken!);
+                allEvaluations = result.evaluations;
+                allUsers = result.users;
+            }
+
+            // Aplicamos filtros de seguridad
+            if (user.role === "DIRECTORA") {
+                // La directora puede ver todo lo de su campus (en este caso Extracurricular o el asignado)
+                data = allEvaluations;
+                console.log('[CHAT DEBUG] Directora viendo todo su campus. Datos:', data.length);
+            } else if (user.role === "COORDINADORA" && user.email) {
+                const currentUser = allUsers.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
                 if (currentUser) {
-                    const coordinatorId = currentUser.id_usuario;
+                    const coordinatorId = String(currentUser.id_usuario);
                     const coordinatorName = currentUser.nombre;
                     userName = coordinatorName;
 
-                    data = evaluations.filter((e: any) =>
-                        (coordinatorId && e.id_usuario_coordinador === coordinatorId) ||
-                        (coordinatorName && e.id_usuario_coordinador === coordinatorName) ||
-                        (coordinatorName && e.nombre_coordinador === coordinatorName)
+                    data = allEvaluations.filter((e: any) =>
+                        String(e.id_usuario_coordinador) === coordinatorId ||
+                        e.nombre_coordinador === coordinatorName ||
+                        e.coordinadora === coordinatorName ||
+                        String(e.id_coordinador) === coordinatorId
                     );
-                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorName} (ID: ${coordinatorId}). Datos:`, data.length);
-                } else {
-                    data = evaluations;
+                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorName}. Datos:`, data.length);
                 }
             } else {
-                data = evaluations;
+                data = allEvaluations;
             }
         }
     } catch (e) {

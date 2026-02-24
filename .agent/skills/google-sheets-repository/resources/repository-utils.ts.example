@@ -1,0 +1,34 @@
+import { google } from "googleapis";
+
+/**
+ * Ejemplo de utilidad para conectar una aplicación con Google Sheets.
+ * Permite leer datos dinámicamente y transformarlos en objetos.
+ */
+export async function fetchSheetData(spreadsheetId: string, range: string, accessToken: string) {
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+
+    const sheets = google.sheets({ version: "v4", auth });
+
+    try {
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range, // Ejemplo: "Sheet1!A:Z"
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) return [];
+
+        const headers = rows[0].map(h => h.trim());
+        return rows.slice(1).map(row => {
+            const obj: any = {};
+            headers.forEach((header, index) => {
+                obj[header] = row[index];
+            });
+            return obj;
+        });
+    } catch (error) {
+        console.error("Error al leer Google Sheets:", error);
+        throw error;
+    }
+}

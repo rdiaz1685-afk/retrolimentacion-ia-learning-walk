@@ -1,8 +1,12 @@
-
 import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { CAMPUS_DATA, RECTORIA_EMAILS, SIMULATION_CONFIG } from "@/config/campus-config";
 
+/**
+ * Ejemplo de implementación con manejo de roles dinámicos basados en email.
+ * Este patrón permite clasificar usuarios (Rector, Director, Coordinador)
+ * sin necesidad de una base de datos externa inicialmente.
+ */
 export const { handlers, auth, signIn, signOut } = NextAuth({
     providers: [
         Google({
@@ -10,7 +14,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
             authorization: {
                 params: {
-                    scope: "openid email profile https://www.googleapis.com/auth/spreadsheets",
+                    scope: "openid email profile https://www.googleapis.com/auth/spreadsheets.readonly",
                 },
             },
         }),
@@ -28,15 +32,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 let role = "GUEST";
                 let campus = null;
 
-                // Aplicar simulación si existe para este correo
-                const sim = SIMULATION_CONFIG[email];
-                if (sim) {
-                    role = sim.role;
-                    campus = sim.campus;
-                    if (sim.mockEmail) {
-                        session.user.email = sim.mockEmail;
-                    }
-                } else if (RECTORIA_EMAILS.map((e: any) => e.toLowerCase()).includes(email)) {
+                // Lógica de validación contra configuración (Ejemplo Campus)
+                if (RECTORIA_EMAILS.map((e: any) => e.toLowerCase()).includes(email)) {
                     role = "RECTOR";
                 } else {
                     for (const [campusName, data] of Object.entries(CAMPUS_DATA)) {
@@ -66,7 +63,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     pages: {
         signIn: "/",
     },
-    secret: process.env.AUTH_SECRET,
 });
 
 declare module "next-auth" {

@@ -8,25 +8,38 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { observation } = await req.json();
+    const { observation, history = [] } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/[\n\r'"]/g, '');
 
     if (!apiKey) {
         return NextResponse.json({ error: "No API Key configured" }, { status: 500 });
     }
 
+    // Formatear historial para el contexto de la IA
+    const historyText = history.length > 0
+        ? history.slice(0, 5).map((h: any) => `- Fecha: ${h.fecha}, Wow: ${h.wows}, Wonder: ${h.wonders}`).join('\n')
+        : "Sin registros previos.";
+
     const prompt = `
-        Eres un experto pedagógico realizando Learning Walks.
-        Analiza esta observación específica y sugiere 3 acciones breves y concretas para el docente.
+        Eres un experto pedagógico de alto nivel. Tu tarea es realizar un análisis de TRAZABILIDAD de un docente basado en su historial de Learning Walks.
         
-        Contexto:
+        OBSERVACIÓN ACTUAL (Fecha: ${observation.fecha}):
         - Maestra: ${observation.maestra}
         - Objetivo: ${observation.objetivo}
         - Wow (Fortaleza): ${observation.wows}
         - Wonder (Área de oportunidad): ${observation.wonders}
 
-        Responde ÚNICAMENTE con una lista numerada de 3 acciones muy breves (máximo 15 palabras cada una).
-        No saludes ni des explicaciones extra.
+        HISTORIAL RECIENTE (Últimas observaciones):
+        ${historyText}
+
+        INSTRUCCIONES:
+        1. Analiza si el 'Wonder' actual es un patrón recurrente.
+        2. Detecta si ha habido mejora en áreas señaladas anteriormente.
+        3. Genera 3 acciones altamente estratégicas y personalizadas.
+        
+        Responde ÚNICAMENTE con una lista numerada de 3 acciones (máximo 20 palabras cada una). 
+        Las acciones deben demostrar que conoces el historial (ej: "Al persistir la falta de participación, implementar técnica X...").
+        No saludes ni des introducciones.
     `;
 
     // List of models to try, prioritizing newer/faster ones that are available

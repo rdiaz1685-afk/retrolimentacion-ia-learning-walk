@@ -68,6 +68,11 @@ export const CAMPUS_DATA = {
         "emails_directora": [
             "evers.grimaldo@cambridgemty.edu.mx"
         ]
+    },
+    "Extracurricular": {
+        "sheet_id": "1CKuFtnMLdCfqCtHH607xzplujVhInbcNwqm-2u9lrWo",
+        "emails_coordinadores": [],
+        "emails_directora": []
     }
 };
 

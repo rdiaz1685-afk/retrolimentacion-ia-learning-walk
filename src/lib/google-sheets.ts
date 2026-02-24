@@ -4,7 +4,7 @@ import { CAMPUS_DATA, SHEET_NAME } from "@/config/campus-config";
 
 export async function getCampusData(campusName: string, accessToken: string) {
     const campus = CAMPUS_DATA[campusName as keyof typeof CAMPUS_DATA];
-    if (!campus) return { evaluations: [], teachers: [], users: [] };
+    if (!campus) return { evaluations: [], teachers: [], users: [], classrooms: [] };
 
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
@@ -24,48 +24,29 @@ export async function getCampusData(campusName: string, accessToken: string) {
     };
 
     try {
-        // 1. Fetch Evaluations
-        const evalResponse = await sheets.spreadsheets.values.get({
+        // Optimización: Rangos más estrechos (A:Z) para reducir el volumen de datos descargados
+        const ranges = [
+            `${SHEET_NAME}!A:Z`,
+            `maestros!A:Z`,
+            `usuarios!A:Z`,
+            `aulas!A:Z`
+        ];
+
+        const batchResponse = await sheets.spreadsheets.values.batchGet({
             spreadsheetId: campus.sheet_id,
-            range: `${SHEET_NAME}!A:ZZ`,
+            ranges: ranges,
         });
-        const evaluationsRaw = rowToObj(evalResponse.data.values);
 
-        // 2. Fetch Teachers
-        let teachers: any[] = [];
-        try {
-            const teachersResponse = await sheets.spreadsheets.values.get({
-                spreadsheetId: campus.sheet_id,
-                range: `maestros!A:ZZ`,
-            });
-            teachers = rowToObj(teachersResponse.data.values);
-        } catch (e) {
-            console.warn(`Pestaña 'maestros' no encontrada en campus ${campusName}`);
-        }
+        const valueRanges = batchResponse.data.valueRanges || [];
 
-        // 3. Fetch Users
-        let users: any[] = [];
-        try {
-            const usersResponse = await sheets.spreadsheets.values.get({
-                spreadsheetId: campus.sheet_id,
-                range: `usuarios!A:ZZ`,
-            });
-            users = rowToObj(usersResponse.data.values);
-        } catch (e) {
-            console.warn(`Pestaña 'usuarios' no encontrada en campus ${campusName}`);
-        }
+        const evaluationsRaw = rowToObj(valueRanges[0]?.values);
+        const teachersRaw = rowToObj(valueRanges[1]?.values);
+        const usersRaw = rowToObj(valueRanges[2]?.values);
+        const classroomsRaw = rowToObj(valueRanges[3]?.values);
 
-        // 4. Fetch Classrooms
-        let classrooms: any[] = [];
-        try {
-            const classroomsResponse = await sheets.spreadsheets.values.get({
-                spreadsheetId: campus.sheet_id,
-                range: `aulas!A:ZZ`,
-            });
-            classrooms = rowToObj(classroomsResponse.data.values);
-        } catch (e) {
-            console.warn(`Pestaña 'aulas' no encontrada en campus ${campusName}`);
-        }
+        const teachers = teachersRaw;
+        const users = usersRaw;
+        const classrooms = classroomsRaw;
 
         // Helper to find a value by multiple possible keys
         const getVal = (obj: any, keys: string[]) => {
@@ -139,10 +120,10 @@ export async function getCampusData(campusName: string, accessToken: string) {
     } catch (error: any) {
         if (error.code === 401 || (error.response && error.response.status === 401)) {
             console.warn(`[AUTH ERROR] Access token expired or invalid for ${campusName}.`);
-            return { evaluations: [], teachers: [], users: [] };
+            return { evaluations: [], teachers: [], users: [], classrooms: [] };
         }
         console.error(`Error fetching data for campus ${campusName}:`, error);
-        return { evaluations: [], teachers: [], users: [] };
+        return { evaluations: [], teachers: [], users: [], classrooms: [] };
     }
 }
 

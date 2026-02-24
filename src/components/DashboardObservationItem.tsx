@@ -11,9 +11,15 @@ interface DashboardObservationItemProps {
     fecha: string;
     wowText?: string;
     wonderText?: string;
+    objetivo?: string;
+    history?: any[];
 }
 
-export function DashboardObservationItem({ maestra, campus, fecha, wowText, wonderText }: DashboardObservationItemProps) {
+import { ObservationAction } from "./ObservationAction";
+
+export function DashboardObservationItem({
+    maestra, campus, fecha, wowText, wonderText, objetivo = "General", history = []
+}: DashboardObservationItemProps) {
     const [activeModal, setActiveModal] = useState<'wow' | 'wonder' | null>(null);
 
     return (
@@ -23,7 +29,7 @@ export function DashboardObservationItem({ maestra, campus, fecha, wowText, wond
                     <p className="font-semibold text-slate-900 group-hover:text-indigo-700 transition">{maestra}</p>
                     <p className="text-xs text-slate-500 font-medium">{campus} • {fecha || "Fecha no registrada"}</p>
                 </div>
-                <div className="flex gap-x-2">
+                <div className="flex items-center gap-x-2">
                     {wowText && (
                         <button
                             onClick={() => setActiveModal('wow')}
@@ -42,6 +48,18 @@ export function DashboardObservationItem({ maestra, campus, fecha, wowText, wond
                             Wonder
                         </button>
                     )}
+                    <div className="w-[1px] h-6 bg-slate-200 mx-1 hidden sm:block" />
+                    <ObservationAction
+                        observation={{
+                            maestra,
+                            campus,
+                            fecha,
+                            wows: wowText || "",
+                            wonders: wonderText || "",
+                            objetivo
+                        }}
+                        history={history}
+                    />
                 </div>
             </div>
 

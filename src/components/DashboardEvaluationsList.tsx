@@ -200,6 +200,8 @@ export const DashboardEvaluationsList = ({
                                         fecha={obs.fecha}
                                         wowText={obs.wows}
                                         wonderText={obs.wonders}
+                                        objetivo={obs.objetivo}
+                                        history={initialData.filter(h => h.maestra === obs.maestra)}
                                     />
                                 </div>
                             </div>

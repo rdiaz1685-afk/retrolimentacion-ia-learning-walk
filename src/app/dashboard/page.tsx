@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getCampusData, getAllData } from "@/lib/google-sheets";
 import { DashboardCharts } from "@/components/DashboardCharts";
-import { DashboardObservationItem } from "@/components/DashboardObservationItem";
 import {
     Users,
     MessageSquare,
@@ -17,6 +16,8 @@ import {
 import { PrintReportButton } from "@/components/PrintReportButton";
 import { DashboardEvaluationsList } from "@/components/DashboardEvaluationsList";
 import { CAMPUS_DATA } from "@/config/campus-config";
+import { ComplianceTable } from "@/components/ComplianceTable";
+import { RefreshButton } from "@/components/RefreshButton";
 
 export default async function DashboardPage() {
     const session = await auth();
@@ -40,43 +41,75 @@ export default async function DashboardPage() {
 
     const { evaluations: rawEvaluations, teachers, users } = context;
 
-    // Filter evaluations by role
-    let filteredEvaluations = rawEvaluations;
-    let progressData = undefined;
+    // --- LOGICA DE CUMPLIMIENTO (COMPLIANCE) ---
+    const allWeeks = [...new Set(rawEvaluations.map((e: any) => e.semana))].filter(Boolean).sort((a: any, b: any) => a - b);
+    const lastWeek = allWeeks[allWeeks.length - 1];
 
-    if (user.role === "COORDINADORA" && user.email) {
-        // 1. Find the current coordinator's ID in the users list
-        const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
-
-        if (currentUser) {
-            const coordinatorId = currentUser.id_usuario;
-
-            // 2. Find teachers assigned to this coordinator
-            // We'll try some common column names: id_usuario_coordinador, id_coordinadora, id_coordinador
-            const assignedTeachers = teachers.filter((t: any) =>
+    const complianceData = users
+        .filter((u: any) => u.id_usuario && (u.nombre || u.email))
+        .map((coord: any) => {
+            const coordinatorId = coord.id_usuario;
+            // Maestros asignados a este coordinador
+            const myTeachers = teachers.filter((t: any) =>
                 t.id_usuario_coordinador === coordinatorId ||
                 t.id_coordinadora === coordinatorId ||
                 t.id_coordinador === coordinatorId
             );
 
-            if (assignedTeachers.length > 0) {
-                // 3. Find which of these teachers have been evaluated
-                const evaluatedTeacherIds = new Set(rawEvaluations.map((e: any) => e.id_maestro));
-                const evaluatedCount = assignedTeachers.filter((t: any) => evaluatedTeacherIds.has(t.id_maestro)).length;
-                const pendingCount = assignedTeachers.length - evaluatedCount;
+            if (myTeachers.length === 0) return null;
 
-                progressData = [
-                    { name: "Evaluadas", value: evaluatedCount },
-                    { name: "Pendientes", value: pendingCount }
-                ];
+            // Historial semanal
+            const weeklyHistory = allWeeks.map((week: any) => {
+                const evalThisWeek = rawEvaluations.filter((e: any) =>
+                    (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
+                    e.semana === week
+                );
+                // Contar cuántos maestros UNICOS evaluó esta semana de su lista asignada
+                const uniqueEvaluated = new Set(evalThisWeek.map((e: any) => e.id_maestro)).size;
+                return {
+                    semana: week,
+                    porcentaje: (uniqueEvaluated / myTeachers.length) * 100
+                };
+            });
 
-                // Also filter the observations list to only show theirs
-                filteredEvaluations = rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId);
-            }
+            // Datos actuales (última semana)
+            const currentEvalCount = new Set(
+                rawEvaluations
+                    .filter((e: any) => (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) && e.semana === lastWeek)
+                    .map((e: any) => e.id_maestro)
+            ).size;
+
+            return {
+                coordinatorName: coord.nombre || coord.email,
+                campus: coord.campus || user.campus || "N/A",
+                totalAssigned: myTeachers.length,
+                completedThisWeek: currentEvalCount,
+                percentage: (currentEvalCount / myTeachers.length) * 100,
+                history: weeklyHistory
+            };
+        })
+        .filter(Boolean);
+
+    // Filtrado de evaluaciones por rol
+    let filteredEvaluations = rawEvaluations;
+    let progressData = undefined;
+
+    if (user.role === "COORDINADORA" && user.email) {
+        const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
+        if (currentUser) {
+            const coordinatorId = currentUser.id_usuario;
+            filteredEvaluations = rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId || e.coordinadora === currentUser.nombre);
+
+            const myTeachers = teachers.filter((t: any) => t.id_usuario_coordinador === coordinatorId);
+            const evaluatedCount = new Set(rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId && e.semana === lastWeek).map((e: any) => e.id_maestro)).size;
+
+            progressData = [
+                { name: "Evaluadas", value: evaluatedCount },
+                { name: "Pendientes", value: Math.max(0, myTeachers.length - evaluatedCount) }
+            ];
         }
     }
 
-    // Map real data to UI fields
     const data = filteredEvaluations.map((item: any) => ({
         maestra: item.nombre_maestro || item.id_maestro || "Maestra no especificada",
         id_maestro: item.id_maestro,
@@ -85,23 +118,22 @@ export default async function DashboardPage() {
         wows: item.WOWS_Texto || "",
         wonders: item.WONDERS_Texto || "",
         fecha: item.fecha || "",
-        semana: item.semana
+        semana: item.semana,
+        objetivo: item.objetivo
     }));
 
     const availableCampuses = Object.keys(CAMPUS_DATA);
 
-    // Statistics calculation based on real data
     const stats = [
-        { label: "Total Observaciones", value: data.length, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-        { label: "Wows Registrados", value: data.filter((d: any) => d.wows).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
-        { label: "Wonders Detectados", value: data.filter((d: any) => d.wonders).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
-        { label: "Última Semana", value: rawEvaluations[rawEvaluations.length - 1]?.semana || "N/A", icon: TrendingUp, color: "text-green-600", bg: "bg-green-100" },
+        { label: "Total Observaciones", value: rawEvaluations.length, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
+        { label: "Wows Registrados", value: rawEvaluations.filter((d: any) => d.WOWS_Texto).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
+        { label: "Wonders Detectados", value: rawEvaluations.filter((d: any) => d.WONDERS_Texto).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
+        { label: "Semana Actual", value: lastWeek || "N/A", icon: TrendingUp, color: "text-green-600", bg: "bg-green-100" },
     ];
 
     return (
         <div className="p-4 md:p-8">
-            {/* Header exclusivo para impresión (oculto en pantalla) */}
-            <div className="hidden print:block mb-8 border-b pb-4 print-header-only">
+            <div className="hidden print:block mb-8 border-b pb-4">
                 <h1 className="text-2xl font-bold text-slate-900">Reporte de Desempeño - Learning Walk</h1>
                 <p className="text-slate-600">Generado por: {user.name} • Fecha: {new Date().toLocaleDateString()}</p>
             </div>
@@ -116,6 +148,7 @@ export default async function DashboardPage() {
                     </p>
                 </div>
                 <div className="flex gap-x-2">
+                    <RefreshButton />
                     <PrintReportButton />
                 </div>
             </div>
@@ -136,6 +169,15 @@ export default async function DashboardPage() {
                 </div>
 
                 <DashboardCharts data={data} role={user.role} progressData={progressData} />
+
+                {(user.role === "RECTOR" || user.role === "DIRECTORA" || user.role === "COORDINADORA") && (
+                    <ComplianceTable
+                        complianceData={user.role === "COORDINADORA"
+                            ? complianceData.filter((c: any) => c?.coordinatorName?.toLowerCase().includes(user.name?.toLowerCase() || ""))
+                            : complianceData
+                        }
+                    />
+                )}
             </div>
 
             <DashboardEvaluationsList

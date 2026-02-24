@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Loader2, Sparkles, X } from "lucide-react";
+import { Bot, Loader2, Sparkles, X } from "lucide-react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +12,13 @@ interface ObservationActionProps {
         objetivo: string;
         wows: string;
         wonders: string;
+        fecha: string;
+        campus?: string;
     };
+    history?: any[];
 }
 
-export function ObservationAction({ observation }: ObservationActionProps) {
+export function ObservationAction({ observation, history = [] }: ObservationActionProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [suggestions, setSuggestions] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +28,10 @@ export function ObservationAction({ observation }: ObservationActionProps) {
         if (!suggestions) {
             setIsLoading(true);
             try {
-                const response = await axios.post("/api/suggestions", { observation });
+                const response = await axios.post("/api/suggestions", {
+                    observation,
+                    history: history.filter(h => h.fecha !== observation.fecha) // Evitar duplicar la actual
+                });
                 setSuggestions(response.data.suggestions);
             } catch (error) {
                 console.error("Error generating suggestions:", error);
@@ -41,8 +47,9 @@ export function ObservationAction({ observation }: ObservationActionProps) {
             <button
                 onClick={handleOpen}
                 className="p-2 hover:bg-white rounded-lg transition border border-transparent hover:border-slate-200 group active:scale-95"
+                title="Ver trazabilidad con IA"
             >
-                <Eye className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+                <Bot className="h-5 w-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
             </button>
 
             {isOpen && (
@@ -51,9 +58,9 @@ export function ObservationAction({ observation }: ObservationActionProps) {
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center gap-x-2">
                                 <div className="p-1.5 bg-indigo-100 rounded-md">
-                                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                                    <Bot className="h-4 w-4 text-indigo-600" />
                                 </div>
-                                <h3 className="font-semibold text-slate-800">Sugerencias de IA</h3>
+                                <h3 className="font-semibold text-slate-800">Análisis de Trazabilidad IA</h3>
                             </div>
                             <button
                                 onClick={() => setIsOpen(false)}

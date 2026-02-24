@@ -27,11 +27,13 @@ interface Teacher {
 export function EvaluationsList({
     data,
     allTeachers = [],
-    availableCampuses = []
+    availableCampuses = [],
+    fullHistory = []
 }: {
     data: Evaluation[],
     allTeachers?: Teacher[],
-    availableCampuses?: string[]
+    availableCampuses?: string[],
+    fullHistory?: Evaluation[]
 }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCampus, setSelectedCampus] = useState("all");
@@ -274,7 +276,10 @@ export function EvaluationsList({
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <ObservationAction observation={obs} />
+                                                <ObservationAction
+                                                    observation={obs}
+                                                    history={fullHistory.filter(h => h.maestra === obs.maestra)}
+                                                />
                                             </td>
                                         </tr>
                                     );
