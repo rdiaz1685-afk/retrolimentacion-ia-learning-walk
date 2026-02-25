@@ -118,20 +118,48 @@ export default async function EvaluationsPage({
         })
         .filter(Boolean);
 
-    // Mapeo de datos para la UI
-    const allMappedData = rawEvaluations.map((item: any) => ({
-        maestra: item.nombre_maestro || item.id_maestro || "Maestra no especificada",
-        id_maestro: item.id_maestro,
-        coordinadora: item.nombre_coordinador || item.id_usuario_coordinador || "Coordinadora",
-        campus: item.campus || user.campus,
-        aula: item.nombre_aula || item.Aula || "",
-        objetivo: item.Objetive || item.objetivo || "",
-        wows: item.WOWS_Texto || "",
-        wonders: item.WONDERS_Texto || "",
-        fecha: item.fecha || "",
-        semana: String(item.semana),
-        quincena: Math.ceil(getWeekNumber(item.semana) / 2)
-    }));
+    // Mapeo de datos para la UI con búsqueda ULTRA-RESILIENTE de columnas
+    const allMappedData = rawEvaluations.map((item: any) => {
+        const getValResilient = (obj: any, searchTerms: string[]) => {
+            // 1. Intento con las llaves exactas proporcionadas
+            for (const k of searchTerms) {
+                if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== "") return obj[k];
+            }
+
+            // 2. Intento INSENSIBLE a mayúsculas/minúsculas y espacios
+            const keys = Object.keys(obj);
+            for (const searchTerm of searchTerms) {
+                const foundKey = keys.find(k => k.trim().toLowerCase() === searchTerm.toLowerCase());
+                if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && String(obj[foundKey]).trim() !== "") {
+                    return obj[foundKey];
+                }
+            }
+
+            // 3. Búsqueda por CONTENIDO parcial (ej: si la columna se llama "Comentarios Wow")
+            for (const searchTerm of searchTerms) {
+                if (searchTerm.length < 3) continue;
+                const partialKey = keys.find(k => k.toLowerCase().includes(searchTerm.toLowerCase()));
+                if (partialKey && obj[partialKey] !== undefined && obj[partialKey] !== null && String(obj[partialKey]).trim() !== "") {
+                    return obj[partialKey];
+                }
+            }
+            return "";
+        };
+
+        return {
+            maestra: item.nombre_maestro || getValResilient(item, ["maestra", "Maestra", "nombre", "maestro"]) || "Maestra no especificada",
+            id_maestro: item.id_maestro,
+            coordinadora: item.nombre_coordinador || getValResilient(item, ["coordinadora", "Coordinador", "Coordinadora", "coordinador"]),
+            campus: item.campus || user.campus,
+            aula: item.nombre_aula || getValResilient(item, ["Aula", "aula", "id_aula"]) || "",
+            objetivo: getValResilient(item, ["Objetive", "objetivo", "Objetivo"]),
+            wows: getValResilient(item, ["WOWS_Texto", "WOWS", "Wows", "Wow", "Fortaleza", "Fortalezas"]),
+            wonders: getValResilient(item, ["WONDERS_Texto", "WONDERS", "Wonders", "Wonder", "Oportunidad", "Oportunidades"]),
+            fecha: item.fecha || "",
+            semana: String(item.semana),
+            quincena: Math.ceil(getWeekNumber(item.semana) / 2)
+        };
+    });
 
     // Filtrar el listado por el rol y la QUINCENA seleccionada
     let displayData = allMappedData.filter((obs: any) => obs.quincena === selectedFortnight);

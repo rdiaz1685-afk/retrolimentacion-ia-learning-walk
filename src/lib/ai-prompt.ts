@@ -75,16 +75,38 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
         delete campusStats[c].maestros;
     });
 
-    // Tomar las últimas 200 observaciones completas para análisis detallado (más datos para comparar)
-    const recentObservations = data.slice(-200).map(item => ({
-        maestra: item.nombre_maestro || item.id_maestro,
-        campus: item.campus,
-        nivel: getNivel(item.nombre_aula || item.Aula),
-        aula: item.nombre_aula || item.Aula,
-        fecha: item.fecha,
-        wow: item.WOWS_Texto,
-        wonder: item.WONDERS_Texto
-    }));
+    // Tomar las últimas 200 observaciones con mapeo ULTRA-RESILIENTE de campos
+    const recentObservations = data.slice(-200).map(item => {
+        const getValResilient = (obj: any, searchTerms: string[]) => {
+            // 1. Exacto
+            for (const k of searchTerms) {
+                if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== "") return obj[k];
+            }
+            // 2. Insensible
+            const keys = Object.keys(obj);
+            for (const searchTerm of searchTerms) {
+                const foundKey = keys.find(k => k.trim().toLowerCase() === searchTerm.toLowerCase());
+                if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && String(obj[foundKey]).trim() !== "") return obj[foundKey];
+            }
+            // 3. Parcial
+            for (const searchTerm of searchTerms) {
+                if (searchTerm.length < 3) continue;
+                const partialKey = keys.find(k => k.toLowerCase().includes(searchTerm.toLowerCase()));
+                if (partialKey && obj[partialKey] !== undefined && obj[partialKey] !== null && String(obj[partialKey]).trim() !== "") return obj[partialKey];
+            }
+            return "";
+        };
+
+        return {
+            maestra: getValResilient(item, ["nombre_maestro", "maestra", "Maestra", "nombre"]),
+            campus: item.campus,
+            nivel: getNivel(getValResilient(item, ["nombre_aula", "Aula", "aula", "id_aula"])),
+            aula: getValResilient(item, ["nombre_aula", "Aula", "aula"]),
+            fecha: item.fecha,
+            wow: getValResilient(item, ["WOWS_Texto", "WOWS", "Wows", "Wow", "Fortaleza"]),
+            wonder: getValResilient(item, ["WONDERS_Texto", "WONDERS", "Wonders", "Wonder", "Oportunidad"])
+        };
+    });
 
     const estadisticas = JSON.stringify({
         totalObservaciones,

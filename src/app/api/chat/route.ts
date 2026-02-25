@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateSystemPrompt } from "@/lib/ai-prompt";
 import { getAllData, getCampusData } from "@/lib/google-sheets";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
     const session = await auth();
@@ -13,7 +14,6 @@ export async function POST(req: NextRequest) {
     const { messages } = await req.json();
     const user = session.user;
 
-    // Limpieza total de la API Key
     const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/[\n\r'"]/g, '');
 
     if (!apiKey) {
@@ -24,8 +24,6 @@ export async function POST(req: NextRequest) {
     let userName = user.name || "Usuario";
 
     try {
-        console.log('[CHAT DEBUG] Usuario:', user.email, 'Rol:', user.role, 'Campus:', user.campus);
-
         let allEvaluations: any[] = [];
         let allUsers: any[] = [];
 
@@ -33,13 +31,9 @@ export async function POST(req: NextRequest) {
             const result = await getAllData(session.accessToken!);
             allEvaluations = result.evaluations;
             allUsers = result.users;
-            data = allEvaluations; // Rector ve todo
-            console.log('[CHAT DEBUG] Rector obteniendo todo:', data.length);
+            data = allEvaluations;
         } else {
-            // Para otros roles, primero obtenemos los datos
             if (user.campus === "Extracurricular" || user.role === "DIRECTORA") {
-                // Si es directora o está en extracurricular, necesitamos ver los datos de esa sede
-                // O si es Directora de Extracurricular específicamente
                 const result = await getCampusData("Extracurricular", session.accessToken!);
                 allEvaluations = result.evaluations;
                 allUsers = result.users;
@@ -49,11 +43,8 @@ export async function POST(req: NextRequest) {
                 allUsers = result.users;
             }
 
-            // Aplicamos filtros de seguridad
             if (user.role === "DIRECTORA") {
-                // La directora puede ver todo lo de su campus (en este caso Extracurricular o el asignado)
                 data = allEvaluations;
-                console.log('[CHAT DEBUG] Directora viendo todo su campus. Datos:', data.length);
             } else if (user.role === "COORDINADORA" && user.email) {
                 const currentUser = allUsers.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
                 if (currentUser) {
@@ -67,7 +58,6 @@ export async function POST(req: NextRequest) {
                         e.coordinadora === coordinatorName ||
                         String(e.id_coordinador) === coordinatorId
                     );
-                    console.log(`[CHAT DEBUG] Filtrando para coordinadora ${coordinatorName}. Datos:`, data.length);
                 }
             } else {
                 data = allEvaluations;
@@ -77,19 +67,38 @@ export async function POST(req: NextRequest) {
         console.error('[CHAT ERROR] Error al obtener datos de Google Sheets:', e);
     }
 
+    const lastMessageRaw = messages[messages.length - 1].content;
+    const lastMessage = lastMessageRaw.toLowerCase();
 
+    // Si es un saludo simple o mensaje corto sin contexto de datos, no enviamos historial pesado
+    const isSimpleGreeting = lastMessage.length < 15 && (
+        lastMessage.includes("hola") ||
+        lastMessage.includes("buenos días") ||
+        lastMessage.includes("qué tal") ||
+        lastMessage.includes("test")
+    );
 
+    let relevantData = data;
 
-    console.log('[CHAT DEBUG] Total de datos para la IA:', data.length);
-
-    // Detección automática de sesión expirada
-    if (data.length === 0) {
-        return NextResponse.json({
-            role: "assistant",
-            content: "⚠️ **No pude encontrar observaciones.**\n\nEsto suele suceder cuando la conexión de seguridad con Google ha expirado (dura 60 min).\n\n**Solución rápida:**\n1. Cierra sesión en el menú de la izquierda.\n2. Vuelve a entrar con tu cuenta de Google.\n\nAl hacerlo, mis permisos se refrescarán y podré ver tus datos de nuevo."
+    if (isSimpleGreeting) {
+        // Para saludos, enviamos solo un par de ejemplos o nada de historial pesado
+        relevantData = data.slice(-2);
+        console.log(`[CHAT DEBUG] Saludo detectado, omitiendo historial pesado.`);
+    } else {
+        // En búsqueda de maestras... con mayor flexibilidad en los nombres de las columnas
+        const teacherMatches = data.filter((e: any) => {
+            const maestroName = (e.nombre_maestro || e.maestra || e.Maestra || e.nombre || "").toLowerCase();
+            return maestroName && lastMessage.includes(maestroName.split(' ')[0]);
         });
-    }
 
+        if (teacherMatches.length > 0) {
+            console.log(`[CHAT DEBUG] Filtrando datos relevantes para la pregunta. Encontrados: ${teacherMatches.length}`);
+            relevantData = teacherMatches;
+        } else if (data.length > 30) {
+            // Bajamos el límite a 30 para ser más conservadores con la cuota gratuita
+            relevantData = data.slice(-30);
+        }
+    }
 
     const systemPrompt = generateSystemPrompt(
         {
@@ -98,55 +107,74 @@ export async function POST(req: NextRequest) {
             campus: (user as any).campus || null,
             name: userName
         },
-        data // Enviar TODAS las observaciones para análisis completo
+        relevantData
     );
 
-    const lastMessage = messages[messages.length - 1].content;
-    const fullPrompt = `${systemPrompt}\n\nPregunta: ${lastMessage}`;
+    const fullPrompt = `${systemPrompt}\n\nPregunta: ${lastMessageRaw}`;
 
-    const candidates = [
-        { model: "gemini-flash-latest", version: "v1beta" },
-        { model: "gemini-2.0-flash", version: "v1beta" },
-        { model: "gemini-3.1-pro-preview", version: "v1beta" }
-    ];
+    try {
+        const maxRetries = 3;
+        let attempt = 0;
+        const candidates = [
+            { model: "gemini-1.5-flash", version: "v1beta" }, // 1,500 msgs/día
+            { model: "gemini-2.0-flash", version: "v1beta" }, // 20 msgs/día
+            { model: "gemini-2.5-flash", version: "v1beta" }  // Experimental
+        ];
 
-    for (const cand of candidates) {
-        try {
-            const url = `https://generativelanguage.googleapis.com/${cand.version}/models/${cand.model}:generateContent?key=${apiKey}`;
+        while (attempt < maxRetries) {
+            attempt++;
+            let lastErr: any = null;
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: fullPrompt }] }]
-                })
-            });
+            for (const cand of candidates) {
+                try {
+                    const genAI = new GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel(
+                        { model: cand.model },
+                        { apiVersion: cand.version }
+                    );
 
-            const result = await response.json();
-
-            if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-                return NextResponse.json({ role: "assistant", content: result.candidates[0].content.parts[0].text });
-            }
-
-            if (result.error) {
-                console.error(`Error con modelo ${cand.model}:`, result.error.message);
-                if (cand === candidates[candidates.length - 1]) {
-                    const code = result.error.code;
-                    const message = result.error.message;
-                    return NextResponse.json({
-                        role: "assistant",
-                        content: `🚨 **Error de Google AI (${code}):** ${message}\n\nSugerencia: Intenta reiniciar el servidor de desarrollo (npm run dev) para que tome la nueva API Key.`
+                    const result = await model.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+                        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
                     });
+
+                    const response = await result.response;
+                    const text = response.text();
+
+                    if (text) {
+                        console.log(`✅ [ATTEMPT ${attempt}] Éxito con: ${cand.model}`);
+                        return NextResponse.json({ role: "assistant", content: text });
+                    }
+                } catch (err: any) {
+                    lastErr = err;
+                    const msg = err.message || "";
+
+                    if (msg.includes("429") || msg.includes("503") || msg.includes("500")) {
+                        console.warn(`⚠️ [ATTEMPT ${attempt}] ${cand.model} ocupado: ${msg}`);
+                        continue;
+                    }
+
+                    if (msg.includes("404")) continue;
+
+                    console.error(`❌ Error fatal en ${cand.model}:`, msg);
+                    break;
                 }
-                continue; // Intentar con el siguiente modelo
             }
-        } catch (err: any) {
-            console.error(`Error de red con ${cand.model}:`, err.message);
-            if (cand === candidates[candidates.length - 1]) {
-                return NextResponse.json({ role: "assistant", content: `Error de red: ${err.message}` });
+
+            if (attempt < maxRetries) {
+                const delay = attempt * 2000;
+                console.log(`⏳ Reintentando consulta completa en ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                const errMsg = lastErr?.message || "Error desconocido";
+                return NextResponse.json({
+                    role: "assistant",
+                    content: `⚠️ **Google está saturado.**\n\nIntenté 3 veces con varios modelos pero no responden. \n\n**Causa probable:** ${errMsg}\n**Solución:** Espera 30 segundos y dale un click más. ¡A veces Google tarda en despertar!`
+                });
             }
         }
+    } catch (err: any) {
+        console.error(`[CHAT ERROR] SDK Error:`, err);
+        return NextResponse.json({ role: "assistant", content: `🚨 **Error de sistema:** ${err.message}` });
     }
-
-    return NextResponse.json({ role: "assistant", content: "Estado vacío o modelos agotados. Intenta reiniciar el servidor." });
 }

@@ -38,12 +38,12 @@ export async function getCampusData(campusName: string, accessToken: string) {
     };
 
     try {
-        // Optimización: Rangos más estrechos (A:Z) para reducir el volumen de datos descargados
+        // Optimización: Rangos amplios (A:ZZ) para asegurar capturar WOWS/WONDERS al final de la hoja
         const ranges = [
-            `${SHEET_NAME}!A:Z`,
-            `maestros!A:Z`,
-            `usuarios!A:Z`,
-            `aulas!A:Z`
+            `${SHEET_NAME}!A:ZZ`,
+            `maestros!A:ZZ`,
+            `usuarios!A:ZZ`,
+            `aulas!A:ZZ`
         ];
 
         const batchResponse = await sheets.spreadsheets.values.batchGet({
@@ -57,6 +57,11 @@ export async function getCampusData(campusName: string, accessToken: string) {
         const teachersRaw = rowToObj(valueRanges[1]?.values);
         const usersRaw = rowToObj(valueRanges[2]?.values);
         const classroomsRaw = rowToObj(valueRanges[3]?.values);
+
+        // DEBUG: Imprimir encabezados para identificar columnas de WOWS/WONDERS
+        if (valueRanges[0]?.values?.[0]) {
+            console.log(`[SHEETS DEBUG] Headers for ${campusName}:`, valueRanges[0].values[0]);
+        }
 
         const teachers = teachersRaw;
         const users = usersRaw;
