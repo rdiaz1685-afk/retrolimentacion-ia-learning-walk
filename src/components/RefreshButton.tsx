@@ -11,14 +11,19 @@ export function RefreshButton() {
 
     const handleRefresh = () => {
         setIsRefreshing(true);
-        // router.refresh() le dice a Next.js que vuelva a ejecutar el Server Component
-        // sin perder el estado del cliente.
+
+        // Forzar actualización de cache en el servidor
         router.refresh();
 
-        // Simular un pequeño delay visual para el usuario
+        // Pequeño truco para forzar actualización de RSC
+        const currentPath = window.location.pathname;
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.set('t', Date.now().toString());
+        router.push(`${currentPath}?${searchParams.toString()}`);
+
         setTimeout(() => {
             setIsRefreshing(false);
-        }, 1000);
+        }, 800);
     };
 
     return (

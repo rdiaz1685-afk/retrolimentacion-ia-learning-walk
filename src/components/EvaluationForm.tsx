@@ -65,7 +65,7 @@ export function EvaluationForm({ teachers, classrooms, campus, coordinator }: Ev
         p5_val: "N/A", p5_obs: "",
         p6_val: "N/A", p6_obs: "",
         colab_val: "N/A", colab_obs: "",
-        tax_nivel: "1 - Recordar",
+        tax_nivel: isExtracurricular ? "" : "1 - Recordar",
         tax_preguntas: "",
         wows: "",
         wonders: ""
@@ -252,42 +252,44 @@ export function EvaluationForm({ teachers, classrooms, campus, coordinator }: Ev
                 )}
             </div>
 
-            {/* Taxonomía */}
-            <div className="bg-slate-900 rounded-2xl p-6 text-white overflow-hidden relative">
-                <Brain className="absolute -right-4 -top-4 h-32 w-32 text-white/5" />
-                <div className="relative z-10 space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-yellow-400" />
-                        <h3 className="font-bold">Nivel de Pensamiento (Taxonomía)</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Total de preguntas realizadas</label>
-                            <input
-                                type="text"
-                                placeholder="Ej: 5 preguntas abiertas..."
-                                value={formData.tax_preguntas}
-                                onChange={(e) => handleChange("tax_preguntas", e.target.value)}
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"
-                            />
+            {/* Taxonomía - No se muestra en Extracurriculares */}
+            {!isExtracurricular && (
+                <div className="bg-slate-900 rounded-2xl p-6 text-white overflow-hidden relative">
+                    <Brain className="absolute -right-4 -top-4 h-32 w-32 text-white/5" />
+                    <div className="relative z-10 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-yellow-400" />
+                            <h3 className="font-bold">Nivel de Pensamiento (Taxonomía)</h3>
                         </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Nivel más alto alcanzado</label>
-                            <select
-                                value={formData.tax_nivel}
-                                onChange={(e) => handleChange("tax_nivel", e.target.value)}
-                                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-yellow-400 outline-none"
-                            >
-                                <option className="text-slate-900" value="1 - Recordar">1 - Recordar</option>
-                                <option className="text-slate-900" value="2 - Entender">2 - Entender</option>
-                                <option className="text-slate-900" value="3 - Aplicar">3 - Aplicar</option>
-                                <option className="text-slate-900" value="4 - Analizar">4 - Analizar</option>
-                                <option className="text-slate-900" value="5 - Evaluar/Crear">5 - Evaluar/Crear</option>
-                            </select>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Total de preguntas realizadas</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: 5 preguntas abiertas..."
+                                    value={formData.tax_preguntas}
+                                    onChange={(e) => handleChange("tax_preguntas", e.target.value)}
+                                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-yellow-400 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">Nivel más alto alcanzado</label>
+                                <select
+                                    value={formData.tax_nivel}
+                                    onChange={(e) => handleChange("tax_nivel", e.target.value)}
+                                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-yellow-400 outline-none"
+                                >
+                                    <option className="text-slate-900" value="1 - Recordar">1 - Recordar</option>
+                                    <option className="text-slate-900" value="2 - Entender">2 - Entender</option>
+                                    <option className="text-slate-900" value="3 - Aplicar">3 - Aplicar</option>
+                                    <option className="text-slate-900" value="4 - Analizar">4 - Analizar</option>
+                                    <option className="text-slate-900" value="5 - Evaluar/Crear">5 - Evaluar/Crear</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Wows & Wonders */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

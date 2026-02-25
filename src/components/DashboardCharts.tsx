@@ -17,11 +17,28 @@ import {
 
 const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f97316', '#10b981'];
 
-export const DashboardCharts = ({ data, role, progressData }: { data: any[], role?: string, progressData?: any[] }) => {
+export const DashboardCharts = ({
+    data,
+    fullHistory,
+    role,
+    progressData
+}: {
+    data: any[],
+    fullHistory?: any[],
+    role?: string,
+    progressData?: any[]
+}) => {
     const isRector = role === "RECTOR";
     const isCoordinadora = role === "COORDINADORA";
 
-    // Process data for charts
+    const getWeekNumber = (val: any) => {
+        if (!val) return 0;
+        const str = String(val).toLowerCase();
+        const match = str.match(/\d+/);
+        return match ? Number(match[0]) : 0;
+    };
+
+    // Process data for counts (Filtered)
     let pieData = [];
     let chartTitle = "";
 
@@ -44,12 +61,24 @@ export const DashboardCharts = ({ data, role, progressData }: { data: any[], rol
         chartTitle = isRector ? "Evaluaciones por Campus" : "Evaluaciones por Coordinadora";
     }
 
-    const barData = [
-        { name: 'Semana 1', count: 12 },
-        { name: 'Semana 2', count: 19 },
-        { name: 'Semana 3', count: 15 },
-        { name: 'Semana 4', count: data.length },
-    ];
+    // Tendencia por quincenas (Using Full History)
+    const trendSource = fullHistory || data;
+    const fortnightlyCounts = trendSource.reduce((acc: any, curr: any) => {
+        const week = getWeekNumber(curr.semana);
+        const q = Math.ceil(week / 2);
+        if (q > 0) {
+            acc[q] = (acc[q] || 0) + 1;
+        }
+        return acc;
+    }, {});
+
+    const barData = Object.keys(fortnightlyCounts)
+        .sort((a, b) => Number(a) - Number(b))
+        .slice(-4) // Últimas 4 quincenas
+        .map(q => ({
+            name: `Q${q}`,
+            count: fortnightlyCounts[q]
+        }));
 
     const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
         return `${(percent * 100).toFixed(0)}%`;

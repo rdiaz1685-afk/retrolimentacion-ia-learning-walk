@@ -45,7 +45,7 @@ export function ComplianceTable({ complianceData, title = "Cumplimiento de Coord
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-                        <p className="text-xs text-slate-500 mt-1">Efectividad basada en maestros asignados vs. evaluados semanalmente.</p>
+                        <p className="text-xs text-slate-500 mt-1">Efectividad basada en maestros asignados vs. evaluados quincenalmente.</p>
                     </div>
 
                     {/* Leyenda de Semáforo */}

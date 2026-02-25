@@ -1,6 +1,9 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
 import { getCampusData, getAllData } from "@/lib/google-sheets";
 import { DashboardCharts } from "@/components/DashboardCharts";
 import {
@@ -18,8 +21,14 @@ import { DashboardEvaluationsList } from "@/components/DashboardEvaluationsList"
 import { CAMPUS_DATA } from "@/config/campus-config";
 import { ComplianceTable } from "@/components/ComplianceTable";
 import { RefreshButton } from "@/components/RefreshButton";
+import { FortnightSelector } from "@/components/WeekSelector";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+    searchParams: searchParamsPromise
+}: {
+    searchParams: Promise<{ quincena?: string }>
+}) {
+    const searchParams = await searchParamsPromise;
     const session = await auth();
 
     if (!session) {
@@ -41,71 +50,102 @@ export default async function DashboardPage() {
 
     const { evaluations: rawEvaluations, teachers, users } = context;
 
-    // --- LOGICA DE CUMPLIMIENTO (COMPLIANCE) ---
-    const allWeeks = [...new Set(rawEvaluations.map((e: any) => e.semana))].filter(Boolean).sort((a: any, b: any) => a - b);
-    const lastWeek = allWeeks[allWeeks.length - 1];
+    // Helper para extraer el número de semana de forma robusta
+    const getWeekNumber = (val: any) => {
+        if (!val) return 0;
+        const str = String(val).toLowerCase();
+        const match = str.match(/\d+/);
+        return match ? Number(match[0]) : 0;
+    };
+
+    // --- LÓGICA DE QUINCENAS ---
+    const allWeeksNum = ([...new Set(rawEvaluations.map((e: any) => getWeekNumber(e.semana)))] as number[])
+        .filter(w => w > 0)
+        .sort((a, b) => a - b);
+
+    const availableFortnights = ([...new Set(allWeeksNum.map(w => Math.ceil(w / 2)))] as number[]).sort((a, b) => a - b);
+    const lastFortnight = availableFortnights[availableFortnights.length - 1] || 0;
+    const selectedFortnight = searchParams.quincena ? Number(searchParams.quincena) : lastFortnight;
+
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const today = new Date();
+
+    const parseDate = (dateStr: string) => {
+        if (!dateStr) return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    };
 
     const complianceData = users
         .filter((u: any) => u.id_usuario && (u.nombre || u.email))
         .map((coord: any) => {
             const coordinatorId = coord.id_usuario;
-            // Maestros asignados a este coordinador
+            const coordinatorCampus = coord.campus;
+
             const myTeachers = teachers.filter((t: any) =>
-                t.id_usuario_coordinador === coordinatorId ||
-                t.id_coordinadora === coordinatorId ||
-                t.id_coordinador === coordinatorId
+                (t.id_usuario_coordinador === coordinatorId ||
+                    t.id_coordinadora === coordinatorId ||
+                    t.id_coordinador === coordinatorId) &&
+                t.campus === coordinatorCampus
             );
 
             if (myTeachers.length === 0) return null;
 
-            // Historial semanal
-            const weeklyHistory = allWeeks.map((week: any) => {
-                const evalThisWeek = rawEvaluations.filter((e: any) =>
-                    (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
-                    e.semana === week
-                );
-                // Contar cuántos maestros UNICOS evaluó esta semana de su lista asignada
-                const uniqueEvaluated = new Set(evalThisWeek.map((e: any) => e.id_maestro)).size;
-                return {
-                    semana: week,
-                    porcentaje: (uniqueEvaluated / myTeachers.length) * 100
-                };
+            const fortnightlyHistory = availableFortnights.map((f: any) => {
+                const evalThisFortnight = rawEvaluations.filter((e: any) => {
+                    const eWeek = getWeekNumber(e.semana);
+                    const eFortnight = Math.ceil(eWeek / 2);
+                    return (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
+                        eFortnight === f &&
+                        e.campus === coordinatorCampus;
+                });
+                const uniqueEvaluated = new Set(evalThisFortnight.map((e: any) => e.id_maestro)).size;
+                return { semana: `Q${f}`, porcentaje: (uniqueEvaluated / myTeachers.length) * 100 };
             });
 
-            // Datos actuales (última semana)
-            const currentEvalCount = new Set(
-                rawEvaluations
-                    .filter((e: any) => (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) && e.semana === lastWeek)
-                    .map((e: any) => e.id_maestro)
-            ).size;
+            // CUMPLIMIENTO PARA LA QUINCENA SELECCIONADA
+            const evalInSelectedFortnight = rawEvaluations.filter((e: any) => {
+                const eWeek = getWeekNumber(e.semana);
+                const eFortnight = Math.ceil(eWeek / 2);
+                return (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
+                    eFortnight === selectedFortnight &&
+                    e.campus === coordinatorCampus;
+            });
+            const uniqueEvaluatedCount = new Set(evalInSelectedFortnight.map((e: any) => e.id_maestro)).size;
 
             return {
                 coordinatorName: coord.nombre || coord.email,
-                campus: coord.campus || user.campus || "N/A",
+                campus: coordinatorCampus || "N/A",
                 totalAssigned: myTeachers.length,
-                completedThisWeek: currentEvalCount,
-                percentage: (currentEvalCount / myTeachers.length) * 100,
-                history: weeklyHistory
+                completedThisWeek: uniqueEvaluatedCount,
+                percentage: (uniqueEvaluatedCount / myTeachers.length) * 100,
+                history: fortnightlyHistory
             };
         })
         .filter(Boolean);
 
-    // Filtrado de evaluaciones por rol
-    let filteredEvaluations = rawEvaluations;
+    // Filtrado de evaluaciones por rol y SELECCIÓN DE QUINCENA
+    let filteredEvaluations = rawEvaluations.filter((e: any) => {
+        const week = getWeekNumber(e.semana);
+        return week > 0 && Math.ceil(week / 2) === selectedFortnight;
+    });
     let progressData = undefined;
 
     if (user.role === "COORDINADORA" && user.email) {
         const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
         if (currentUser) {
             const coordinatorId = currentUser.id_usuario;
-            filteredEvaluations = rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId || e.coordinadora === currentUser.nombre);
+
+            // Evaluaciones de la coordinadora en la quincena seleccionada
+            filteredEvaluations = filteredEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId || e.coordinadora === currentUser.nombre);
 
             const myTeachers = teachers.filter((t: any) => t.id_usuario_coordinador === coordinatorId);
-            const evaluatedCount = new Set(rawEvaluations.filter((e: any) => e.id_usuario_coordinador === coordinatorId && e.semana === lastWeek).map((e: any) => e.id_maestro)).size;
+            const evaluatedCountInFortnight = new Set(filteredEvaluations.map((e: any) => e.id_maestro)).size;
 
             progressData = [
-                { name: "Evaluadas", value: evaluatedCount },
-                { name: "Pendientes", value: Math.max(0, myTeachers.length - evaluatedCount) }
+                { name: "Evaluadas", value: evaluatedCountInFortnight },
+                { name: "Pendientes", value: Math.max(0, myTeachers.length - evaluatedCountInFortnight) }
             ];
         }
     }
@@ -124,11 +164,12 @@ export default async function DashboardPage() {
 
     const availableCampuses = Object.keys(CAMPUS_DATA);
 
+    const lastWeek = allWeeksNum[allWeeksNum.length - 1];
     const stats = [
-        { label: "Total Observaciones", value: rawEvaluations.length, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-        { label: "Wows Registrados", value: rawEvaluations.filter((d: any) => d.WOWS_Texto).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
-        { label: "Wonders Detectados", value: rawEvaluations.filter((d: any) => d.WONDERS_Texto).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
-        { label: "Semana Actual", value: lastWeek || "N/A", icon: TrendingUp, color: "text-green-600", bg: "bg-green-100" },
+        { label: "Obs. Quincena", value: filteredEvaluations.length, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
+        { label: "Wows (Quincena)", value: filteredEvaluations.filter((d: any) => d.WOWS_Texto).length, icon: Award, color: "text-yellow-600", bg: "bg-yellow-100" },
+        { label: "Wonders (Quincena)", value: filteredEvaluations.filter((d: any) => d.WONDERS_Texto).length, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-100" },
+        { label: "Total Histórico", value: rawEvaluations.length, icon: TrendingUp, color: "text-slate-600", bg: "bg-slate-100" },
     ];
 
     return (
@@ -143,11 +184,12 @@ export default async function DashboardPage() {
                     <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Bienvenido, {user.name}</h1>
                     <p className="text-sm md:text-base text-slate-500">
                         {user.role === "RECTOR"
-                            ? "Reporte consolidado de todos los campus."
-                            : `Panel de control - Campus ${user.campus}`}
+                            ? `Reporte consolidado - Quincena ${selectedFortnight}`
+                            : `Panel de control - Campus ${user.campus} - Quincena ${selectedFortnight}`}
                     </p>
                 </div>
-                <div className="flex gap-x-2">
+                <div className="flex items-center gap-x-2">
+                    <FortnightSelector fortnights={availableFortnights} currentFortnight={selectedFortnight} />
                     <RefreshButton />
                     <PrintReportButton />
                 </div>
@@ -168,7 +210,12 @@ export default async function DashboardPage() {
                     ))}
                 </div>
 
-                <DashboardCharts data={data} role={user.role} progressData={progressData} />
+                <DashboardCharts
+                    data={data}
+                    fullHistory={rawEvaluations}
+                    role={user.role}
+                    progressData={progressData}
+                />
 
                 {(user.role === "RECTOR" || user.role === "DIRECTORA" || user.role === "COORDINADORA") && (
                     <ComplianceTable

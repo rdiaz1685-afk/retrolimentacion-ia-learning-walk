@@ -1,8 +1,10 @@
 
 import { google } from "googleapis";
 import { CAMPUS_DATA, SHEET_NAME } from "@/config/campus-config";
+import { unstable_noStore as noStore } from "next/cache";
 
 export async function getCampusData(campusName: string, accessToken: string) {
+    noStore();
     const campus = CAMPUS_DATA[campusName as keyof typeof CAMPUS_DATA];
     if (!campus) return { evaluations: [], teachers: [], users: [], classrooms: [] };
 
@@ -14,13 +16,25 @@ export async function getCampusData(campusName: string, accessToken: string) {
     const rowToObj = (rows: any[][] | null | undefined) => {
         if (!rows || rows.length === 0) return [];
         const headers = rows[0].map(h => h.trim());
-        return rows.slice(1).map(row => {
-            const obj: any = {};
-            headers.forEach((header, index) => {
-                obj[header] = row[index];
+        return rows.slice(1)
+            .filter(row => {
+                if (!row || row.length === 0) return false;
+                // Una fila es válida si tiene contenido en al menos 3 columnas (para evitar filas con un solo espacio accidental)
+                const meaningfulCells = row.filter(cell =>
+                    cell !== "" &&
+                    cell !== undefined &&
+                    cell !== null &&
+                    String(cell).trim().length > 0
+                );
+                return meaningfulCells.length >= 3;
+            })
+            .map(row => {
+                const obj: any = {};
+                headers.forEach((header, index) => {
+                    obj[header] = row[index];
+                });
+                return obj;
             });
-            return obj;
-        });
     };
 
     try {
@@ -93,23 +107,25 @@ export async function getCampusData(campusName: string, accessToken: string) {
             nombre_aula: getVal(c, ["nombre_aula", "nombre", "Nombre"])
         }));
 
-        const evaluations = evaluationsRaw.map((obj: any) => {
-            // Find IDs using multiple common keys
-            const maestroId = getVal(obj, ["id_maestro", "Maestra", "maestra"]);
-            const coordinadorId = getVal(obj, ["id_usuario_coordinador", "Coordinadora", "coordinadora", "id_coordinador"]);
-            const aulaId = getVal(obj, ["Aula", "id_aula", "aula"]);
+        const evaluations = evaluationsRaw
+            .filter((obj: any) => getVal(obj, ["id_maestro", "Maestra", "maestra"]))
+            .map((obj: any) => {
+                // Find IDs using multiple common keys
+                const maestroId = getVal(obj, ["id_maestro", "Maestra", "maestra"]);
+                const coordinadorId = getVal(obj, ["id_usuario_coordinador", "Coordinadora", "coordinadora", "id_coordinador"]);
+                const aulaId = getVal(obj, ["Aula", "id_aula", "aula"]);
 
-            // Enrichment
-            obj.nombre_maestro = (maestroId && teachersMap[maestroId]) || maestroId || "Desconocida";
-            obj.nombre_coordinador = (coordinadorId && usersMap[coordinadorId]) || coordinadorId || "Desconocida";
-            obj.nombre_aula = (aulaId && classroomsMap[aulaId]) || aulaId || "Desconocida";
+                // Enrichment
+                obj.nombre_maestro = (maestroId && teachersMap[maestroId]) || maestroId || "Desconocida";
+                obj.nombre_coordinador = (coordinadorId && usersMap[coordinadorId]) || coordinadorId || "Desconocida";
+                obj.nombre_aula = (aulaId && classroomsMap[aulaId]) || aulaId || "Desconocida";
 
-            // Ensure these keys exist for consistent access in UI
-            obj.id_maestro = maestroId;
-            obj.id_usuario_coordinador = coordinadorId;
+                // Ensure these keys exist for consistent access in UI
+                obj.id_maestro = maestroId;
+                obj.id_usuario_coordinador = coordinadorId;
 
-            return obj;
-        });
+                return obj;
+            });
 
         return {
             evaluations,
@@ -128,6 +144,7 @@ export async function getCampusData(campusName: string, accessToken: string) {
 }
 
 export async function getAllData(accessToken: string) {
+    noStore();
     const allEvaluations: any[] = [];
     const allTeachers: any[] = [];
     const allUsers: any[] = [];

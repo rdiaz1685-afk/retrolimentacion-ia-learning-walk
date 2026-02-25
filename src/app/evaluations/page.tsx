@@ -1,19 +1,22 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
 import { getCampusData, getAllData } from "@/lib/google-sheets";
 import { EvaluationsList } from "@/components/EvaluationsList";
 import { CAMPUS_DATA } from "@/config/campus-config";
 import { ComplianceTable } from "@/components/ComplianceTable";
 import { RefreshButton } from "@/components/RefreshButton";
-import { WeekSelector } from "@/components/WeekSelector";
+import { FortnightSelector } from "@/components/WeekSelector";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
 export default async function EvaluationsPage({
     searchParams: searchParamsPromise
 }: {
-    searchParams: Promise<{ semana?: string }>
+    searchParams: Promise<{ semana?: string; quincena?: string }>
 }) {
     const searchParams = await searchParamsPromise;
     const session = await auth();
@@ -37,53 +40,80 @@ export default async function EvaluationsPage({
 
     const { evaluations: rawEvaluations, teachers, users } = context;
 
-    // --- LÓGICA DE SEMANAS ---
-    const allWeeks: string[] = [...new Set(rawEvaluations.map((e: any) => String(e.semana)))]
-        .filter(w => w && w !== "undefined")
-        .sort((a, b) => Number(a) - Number(b)) as string[];
+    // Helper para extraer el número de semana de forma robusta
+    const getWeekNumber = (val: any) => {
+        if (!val) return 0;
+        const str = String(val).toLowerCase();
+        const match = str.match(/\d+/);
+        return match ? Number(match[0]) : 0;
+    };
 
-    const lastWeek = allWeeks[allWeeks.length - 1] || "";
-    const selectedWeek = searchParams.semana || lastWeek;
+    // --- LÓGICA DE QUINCENAS ---
+    const allWeeksNum = ([...new Set(rawEvaluations.map((e: any) => getWeekNumber(e.semana)))] as number[])
+        .filter(w => w > 0)
+        .sort((a, b) => a - b);
 
-    // --- LÓGICA DE CUMPLIMIENTO (Sincronizada con la semana seleccionada) ---
+    const availableFortnights = ([...new Set(allWeeksNum.map(w => Math.ceil(w / 2)))] as number[]).sort((a, b) => a - b);
+    const lastFortnight = availableFortnights[availableFortnights.length - 1] || 0;
+    const selectedFortnight = searchParams.quincena ? Number(searchParams.quincena) : lastFortnight;
+
+    const selectedWeek = searchParams.semana || ""; // Mantener por compatibilidad
+
+    // --- LÓGICA DE CUMPLIMIENTO QUINCENAL (14 DÍAS DE GRACIA) ---
+    const today = new Date();
+    const msPerDay = 24 * 60 * 60 * 1000;
+
+    const parseDate = (dateStr: string) => {
+        if (!dateStr) return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    };
+
+    const fortnights: number[] = availableFortnights;
+
     const complianceData = users
         .filter((u: any) => u.id_usuario && (u.nombre || u.email))
         .map((coord: any) => {
             const coordinatorId = coord.id_usuario;
+            const coordinatorCampus = coord.campus;
+
             const myTeachers = teachers.filter((t: any) =>
-                t.id_usuario_coordinador === coordinatorId ||
-                t.id_coordinadora === coordinatorId ||
-                t.id_coordinador === coordinatorId
+                (t.id_usuario_coordinador === coordinatorId ||
+                    t.id_coordinadora === coordinatorId ||
+                    t.id_coordinador === coordinatorId) &&
+                t.campus === coordinatorCampus
             );
 
             if (myTeachers.length === 0) return null;
 
-            const weeklyHistory = allWeeks.map((week: any) => {
-                const evalThisWeek = rawEvaluations.filter((e: any) =>
-                    (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
-                    String(e.semana) === week
-                );
-                const uniqueEvaluated = new Set(evalThisWeek.map((e: any) => e.id_maestro)).size;
-                return { semana: week, porcentaje: (uniqueEvaluated / myTeachers.length) * 100 };
+            const fortnightlyHistory = fortnights.map((f: any) => {
+                const evalThisFortnight = rawEvaluations.filter((e: any) => {
+                    const eFortnight = Math.ceil(Number(e.semana) / 2);
+                    return (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
+                        eFortnight === f &&
+                        e.campus === coordinatorCampus;
+                });
+                const uniqueEvaluated = new Set(evalThisFortnight.map((e: any) => e.id_maestro)).size;
+                return { semana: `Q${f}`, porcentaje: (uniqueEvaluated / myTeachers.length) * 100 };
             });
 
-            // Cumplimiento para la semana SELECCIONADA
-            const selectedEvalCount = new Set(
-                rawEvaluations
-                    .filter((e: any) =>
-                        (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
-                        String(e.semana) === selectedWeek
-                    )
-                    .map((e: any) => e.id_maestro)
-            ).size;
+            // CUMPLIMIENTO PARA LA QUINCENA SELECCIONADA
+            const evalInSelectedFortnight = rawEvaluations.filter((e: any) => {
+                const eFortnight = Math.ceil(Number(e.semana) / 2);
+                return (e.id_usuario_coordinador === coordinatorId || e.coordinadora === coord.nombre) &&
+                    eFortnight === selectedFortnight &&
+                    e.campus === coordinatorCampus;
+            });
+            const uniqueEvaluatedCount = new Set(evalInSelectedFortnight.map((e: any) => e.id_maestro)).size;
 
             return {
                 coordinatorName: coord.nombre || coord.email,
-                campus: coord.campus || user.campus || "N/A",
+                campus: coordinatorCampus || "N/A",
                 totalAssigned: myTeachers.length,
-                completedThisWeek: selectedEvalCount,
-                percentage: (selectedEvalCount / myTeachers.length) * 100,
-                history: weeklyHistory
+                completedThisWeek: uniqueEvaluatedCount,
+                percentage: (uniqueEvaluatedCount / myTeachers.length) * 100,
+                history: fortnightlyHistory
             };
         })
         .filter(Boolean);
@@ -99,11 +129,12 @@ export default async function EvaluationsPage({
         wows: item.WOWS_Texto || "",
         wonders: item.WONDERS_Texto || "",
         fecha: item.fecha || "",
-        semana: String(item.semana)
+        semana: String(item.semana),
+        quincena: Math.ceil(getWeekNumber(item.semana) / 2)
     }));
 
-    // Filipar el listado por el rol y la semana seleccionada
-    let displayData = allMappedData.filter((obs: any) => obs.semana === selectedWeek);
+    // Filtrar el listado por el rol y la QUINCENA seleccionada
+    let displayData = allMappedData.filter((obs: any) => obs.quincena === selectedFortnight);
 
     if (user.role === "COORDINADORA" && user.email) {
         const currentUser = users.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
@@ -129,7 +160,7 @@ export default async function EvaluationsPage({
                     >
                         <Plus className="h-4 w-4" /> Nueva Observación Extracurricular
                     </Link>
-                    <WeekSelector weeks={allWeeks} currentWeek={String(selectedWeek)} />
+                    <FortnightSelector fortnights={availableFortnights} currentFortnight={selectedFortnight} />
                     <RefreshButton />
                 </div>
             </div>
@@ -138,7 +169,7 @@ export default async function EvaluationsPage({
             {(user.role === "RECTOR" || user.role === "DIRECTORA" || user.role === "COORDINADORA") && (
                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                     <ComplianceTable
-                        title={`Cumplimiento Semana ${String(selectedWeek)}`}
+                        title="Efectividad de Observación (Ventana 14 días)"
                         complianceData={(complianceData as any[]).filter(c => {
                             if (user.role !== "COORDINADORA") return true;
                             return c?.coordinatorName?.toLowerCase().includes(user.name?.toLowerCase() || "");
