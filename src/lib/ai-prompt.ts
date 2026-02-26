@@ -59,11 +59,14 @@ export function generateSystemPrompt(user: { email: string; role: string; campus
         }
         nivelStats[nivel].total++;
 
-        if (item.WOWS_Texto) {
+        const wowVal = item.WOWS_Texto || item.WOWS || item.Wows || item.Wow || item.Fortaleza || "";
+        const wonderVal = item.WONDERS_Texto || item.WONDERS || item.Wonders || item.Wonder || item.Oportunidad || "";
+
+        if (String(wowVal).trim()) {
             campusStats[campusName].wows++;
             nivelStats[nivel].wows++;
         }
-        if (item.WONDERS_Texto) {
+        if (String(wonderVal).trim()) {
             campusStats[campusName].wonders++;
             nivelStats[nivel].wonders++;
         }

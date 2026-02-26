@@ -1,24 +1,52 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateSystemPrompt } from "@/lib/ai-prompt";
 import { getAllData, getCampusData } from "@/lib/google-sheets";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
+async function callGeminiSafe(prompt: string, apiKey: string, modelName: string, version: string, attempt = 1): Promise<string> {
+    const URL = `https://generativelanguage.googleapis.com/${version}/models/${modelName}:generateContent?key=${apiKey}`;
+
+    try {
+        const response = await fetch(URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+        }
+
+        if (response.status === 429 && attempt < 3) {
+            console.warn(`[CHAT] Límite en ${modelName}. Esperando 10s... (Intento ${attempt})`);
+            await new Promise(r => setTimeout(r, 10000));
+            return callGeminiSafe(prompt, apiKey, modelName, version, attempt + 1);
+        }
+
+        throw new Error(data.error?.message || "Error en respuesta de IA");
+    } catch (e: any) {
+        if (attempt < 3 && !e.message.includes("429")) {
+            return callGeminiSafe(prompt, apiKey, modelName, version, attempt + 1);
+        }
+        throw e;
+    }
+}
 
 export async function POST(req: NextRequest) {
     const session = await auth();
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { messages } = await req.json();
     const user = session.user;
-
     const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/[\n\r'"]/g, '');
 
-    if (!apiKey) {
-        return NextResponse.json({ role: "assistant", content: "Error: No hay GEMINI_API_KEY configurada." });
-    }
+    if (!apiKey) return NextResponse.json({ role: "assistant", content: "Error: No hay API_KEY configurada." });
 
     let data = [];
     let userName = user.name || "Usuario";
@@ -33,12 +61,9 @@ export async function POST(req: NextRequest) {
             allUsers = result.users;
             data = allEvaluations;
         } else {
-            if (user.campus === "Extracurricular" || user.role === "DIRECTORA") {
-                const result = await getCampusData("Extracurricular", session.accessToken!);
-                allEvaluations = result.evaluations;
-                allUsers = result.users;
-            } else if (user.campus) {
-                const result = await getCampusData(user.campus, session.accessToken!);
+            const campusToFetch = (user.campus === "Extracurricular" || user.role === "DIRECTORA") ? "Extracurricular" : (user.campus || "");
+            if (campusToFetch) {
+                const result = await getCampusData(campusToFetch, session.accessToken!);
                 allEvaluations = result.evaluations;
                 allUsers = result.users;
             }
@@ -48,15 +73,10 @@ export async function POST(req: NextRequest) {
             } else if (user.role === "COORDINADORA" && user.email) {
                 const currentUser = allUsers.find((u: any) => u.email?.toLowerCase() === user.email?.toLowerCase());
                 if (currentUser) {
-                    const coordinatorId = String(currentUser.id_usuario);
-                    const coordinatorName = currentUser.nombre;
-                    userName = coordinatorName;
-
+                    const coordId = String(currentUser.id_usuario);
+                    userName = currentUser.nombre;
                     data = allEvaluations.filter((e: any) =>
-                        String(e.id_usuario_coordinador) === coordinatorId ||
-                        e.nombre_coordinador === coordinatorName ||
-                        e.coordinadora === coordinatorName ||
-                        String(e.id_coordinador) === coordinatorId
+                        String(e.id_usuario_coordinador) === coordId || e.coordinadora === userName
                     );
                 }
             } else {
@@ -64,117 +84,109 @@ export async function POST(req: NextRequest) {
             }
         }
     } catch (e) {
-        console.error('[CHAT ERROR] Error al obtener datos de Google Sheets:', e);
+        console.error('[CHAT ERROR] Sheets error:', e);
     }
 
     const lastMessageRaw = messages[messages.length - 1].content;
-    const lastMessage = lastMessageRaw.toLowerCase();
+    const isSimpleGreeting = lastMessageRaw.length < 15 && /hola|buenos|tal|test/i.test(lastMessageRaw);
+    const msgLower = lastMessageRaw.toLowerCase();
 
-    // Si es un saludo simple o mensaje corto sin contexto de datos, no enviamos historial pesado
-    const isSimpleGreeting = lastMessage.length < 15 && (
-        lastMessage.includes("hola") ||
-        lastMessage.includes("buenos días") ||
-        lastMessage.includes("qué tal") ||
-        lastMessage.includes("test")
-    );
-
-    let relevantData = data;
+    let relevantData: any[] = [];
 
     if (isSimpleGreeting) {
-        // Para saludos, enviamos solo un par de ejemplos o nada de historial pesado
         relevantData = data.slice(-2);
-        console.log(`[CHAT DEBUG] Saludo detectado, omitiendo historial pesado.`);
-    } else {
-        // En búsqueda de maestras... con mayor flexibilidad en los nombres de las columnas
-        const teacherMatches = data.filter((e: any) => {
-            const maestroName = (e.nombre_maestro || e.maestra || e.Maestra || e.nombre || "").toLowerCase();
-            return maestroName && lastMessage.includes(maestroName.split(' ')[0]);
+    } else if ((user as any).role === "RECTOR") {
+        // Para el RECTOR: agrupar por campus con totales reales antes de cortar
+        const byCampus: Record<string, any[]> = {};
+        data.forEach((e: any) => {
+            const c = e.campus || "Sin campus";
+            if (!byCampus[c]) byCampus[c] = [];
+            byCampus[c].push(e);
         });
 
-        if (teacherMatches.length > 0) {
-            console.log(`[CHAT DEBUG] Filtrando datos relevantes para la pregunta. Encontrados: ${teacherMatches.length}`);
-            relevantData = teacherMatches;
-        } else if (data.length > 30) {
-            // Bajamos el límite a 30 para ser más conservadores con la cuota gratuita
-            relevantData = data.slice(-30);
+        // Totales reales por campus (ANTES del corte) — para contexto del prompt
+        const realTotals: Record<string, number> = {};
+        Object.keys(byCampus).forEach(c => { realTotals[c] = byCampus[c].length; });
+
+        // Detectar campus mencionados en la pregunta
+        const campusKeywords: Record<string, string[]> = {
+            "Cumbres": ["cumbres"],
+            "Mitras": ["mitras"],
+            "Dominio": ["dominio"],
+            "Norte": ["norte"],
+            "Anahuac": ["anahuac", "anáhuac"],
+            "Extracurricular": ["extracurricular"]
+        };
+
+        const mentionedCampus = Object.keys(campusKeywords).filter(campusName =>
+            campusKeywords[campusName].some(kw => msgLower.includes(kw))
+        );
+
+        if (mentionedCampus.length > 0) {
+            // Campus específicos: enviar hasta 200 observaciones por campus (límite ai-prompt)
+            mentionedCampus.forEach(campusName => {
+                const campusData = byCampus[campusName] || [];
+                relevantData.push(...campusData.slice(-200));
+            });
+        } else {
+            // Pregunta general: hasta 50 registros de CADA campus
+            Object.keys(byCampus).forEach(campusName => {
+                relevantData.push(...byCampus[campusName].slice(-50));
+            });
         }
+
+        // Inyectar totales reales como primer elemento con metadata
+        // para que la IA sepa cuántas observaciones existen en total por campus
+        (relevantData as any)._campusTotals = realTotals;
+    } else {
+        relevantData = data.slice(-30);
     }
 
-    const systemPrompt = generateSystemPrompt(
-        {
-            email: user.email!,
-            role: (user as any).role!,
-            campus: (user as any).campus || null,
-            name: userName
-        },
-        relevantData
-    );
+    // Filtro adicional por nombre de maestra si se menciona explícitamente
+    const specificTeacher = data.filter((e: any) => {
+        const name = (e.nombre_maestro || e.maestra || "").toLowerCase();
+        return name && name.length > 3 && msgLower.includes(name.split(' ')[0]);
+    });
+    if (specificTeacher.length > 0) relevantData = specificTeacher;
 
-    const fullPrompt = `${systemPrompt}\n\nPregunta: ${lastMessageRaw}`;
+    // Contexto adicional de totales reales para el prompt del RECTOR
+    const campusTotals: Record<string, number> = (relevantData as any)._campusTotals || {};
+    const campusTotalsContext = Object.keys(campusTotals).length > 0
+        ? `\n\nNOTA IMPORTANTE DE CONTEXTO:\nLos totales reales de observaciones históricas por campus son: ${JSON.stringify(campusTotals)}.\nEn el análisis siguiente se incluyen las últimas ${relevantData.length} observaciones (muestra representativa). Al mencionar totales, usa los totales reales, NO el número de observaciones de la muestra.\n`
+        : "";
+
+    const systemPrompt = generateSystemPrompt({
+        email: user.email!,
+        role: (user as any).role!,
+        campus: (user as any).campus || null,
+        name: userName
+    }, relevantData);
+
+    // LOG DE DIAGNÓSTICO: muestra cuántos registros por campus van a la IA
+    const campusCount: Record<string, number> = {};
+    relevantData.forEach((e: any) => {
+        const c = e.campus || "sin-campus";
+        campusCount[c] = (campusCount[c] || 0) + 1;
+    });
+    console.log(`[CHAT] Rol: ${(user as any).role} | "${lastMessageRaw.substring(0, 60)}" | Registros a IA:`, campusCount);
+
+    const fullPrompt = `${systemPrompt}${campusTotalsContext}\n\nPregunta: ${lastMessageRaw}`;
 
     try {
-        const maxRetries = 3;
-        let attempt = 0;
-        const candidates = [
-            { model: "gemini-1.5-flash", version: "v1beta" }, // 1,500 msgs/día
-            { model: "gemini-2.0-flash", version: "v1beta" }, // 20 msgs/día
-            { model: "gemini-2.5-flash", version: "v1beta" }  // Experimental
-        ];
-
-        while (attempt < maxRetries) {
-            attempt++;
-            let lastErr: any = null;
-
-            for (const cand of candidates) {
-                try {
-                    const genAI = new GoogleGenerativeAI(apiKey);
-                    const model = genAI.getGenerativeModel(
-                        { model: cand.model },
-                        { apiVersion: cand.version }
-                    );
-
-                    const result = await model.generateContent({
-                        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
-                    });
-
-                    const response = await result.response;
-                    const text = response.text();
-
-                    if (text) {
-                        console.log(`✅ [ATTEMPT ${attempt}] Éxito con: ${cand.model}`);
-                        return NextResponse.json({ role: "assistant", content: text });
-                    }
-                } catch (err: any) {
-                    lastErr = err;
-                    const msg = err.message || "";
-
-                    if (msg.includes("429") || msg.includes("503") || msg.includes("500")) {
-                        console.warn(`⚠️ [ATTEMPT ${attempt}] ${cand.model} ocupado: ${msg}`);
-                        continue;
-                    }
-
-                    if (msg.includes("404")) continue;
-
-                    console.error(`❌ Error fatal en ${cand.model}:`, msg);
-                    break;
-                }
-            }
-
-            if (attempt < maxRetries) {
-                const delay = attempt * 2000;
-                console.log(`⏳ Reintentando consulta completa en ${delay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-                const errMsg = lastErr?.message || "Error desconocido";
-                return NextResponse.json({
-                    role: "assistant",
-                    content: `⚠️ **Google está saturado.**\n\nIntenté 3 veces con varios modelos pero no responden. \n\n**Causa probable:** ${errMsg}\n**Solución:** Espera 30 segundos y dale un click más. ¡A veces Google tarda en despertar!`
-                });
-            }
+        let text = "";
+        try {
+            // Intentar primero con la versión v1 (estable)
+            text = await callGeminiSafe(fullPrompt, apiKey, "gemini-2.0-flash", "v1beta");
+        } catch (e) {
+            console.warn("[CHAT] Falló gemini-2.0-flash, intentando con gemini-2.5-flash...");
+            text = await callGeminiSafe(fullPrompt, apiKey, "gemini-2.5-flash", "v1beta");
         }
+
+        return NextResponse.json({ role: "assistant", content: text });
     } catch (err: any) {
-        console.error(`[CHAT ERROR] SDK Error:`, err);
-        return NextResponse.json({ role: "assistant", content: `🚨 **Error de sistema:** ${err.message}` });
+        return NextResponse.json({
+            role: "assistant",
+            content: `⚠️ **Saturación en Google.**\n\nDetalle: ${err.message}\n\n*Consejo: Espera 10 segundos y reintenta. Es el límite de la versión gratuita.*`
+        });
     }
 }

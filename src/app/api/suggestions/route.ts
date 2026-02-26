@@ -1,101 +1,82 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
+async function callGeminiSafe(prompt: string, apiKey: string, modelName: string, version: string, attempt = 1): Promise<string> {
+    const URL = `https://generativelanguage.googleapis.com/${version}/models/${modelName}:generateContent?key=${apiKey}`;
+
+    try {
+        const response = await fetch(URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 1000 }
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+        }
+
+        // Si es error de cuota (429), reintentar con espera estilo Profesoria
+        if (response.status === 429 && attempt < 3) {
+            console.warn(`[SUGGESTIONS] Límite en ${modelName}. Esperando 10s... (Intento ${attempt})`);
+            await new Promise(r => setTimeout(r, 10000));
+            return callGeminiSafe(prompt, apiKey, modelName, version, attempt + 1);
+        }
+
+        throw new Error(data.error?.message || "Error en respuesta de IA");
+    } catch (e: any) {
+        if (attempt < 3 && !e.message.includes("429")) {
+            return callGeminiSafe(prompt, apiKey, modelName, version, attempt + 1);
+        }
+        throw e;
+    }
+}
+
 export async function POST(req: NextRequest) {
     const session = await auth();
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { observation, history = [] } = await req.json();
+    const body = await req.json();
+    const { observation, history = [] } = body;
     const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/[\n\r'"]/g, '');
 
-    if (!apiKey) {
-        return NextResponse.json({ error: "No API Key configured" }, { status: 500 });
-    }
+    if (!apiKey) return NextResponse.json({ error: "No API Key configured" }, { status: 500 });
 
-    // Formatear historial para el contexto de la IA
-    const historyText = history.length > 0
-        ? history.slice(0, 5).map((h: any) => `- Fecha: ${h.fecha}, Wow: ${h.wows}, Wonder: ${h.wonders}`).join('\n')
-        : "Sin registros previos.";
+    const recentHistory = [...history].reverse();
+    const historyText = recentHistory.length > 0
+        ? recentHistory.slice(0, 3).map((h: any) => `F:${h.fecha} W:${h.wows} ON:${h.wonders}`).join(' | ')
+        : "Sin historial.";
 
-    const prompt = `
-        Eres un experto pedagógico de alto nivel. Tu tarea es realizar un análisis de TRAZABILIDAD de un docente basado en su historial de Learning Walks.
-        
-        OBSERVACIÓN ACTUAL (Fecha: ${observation.fecha}):
-        - Maestra: ${observation.maestra}
-        - Objetivo: ${observation.objetivo}
-        - Wow (Fortaleza): ${observation.wows}
-        - Wonder (Área de oportunidad): ${observation.wonders}
+    const prompt = `Actúa como experto pedagógico. Analiza trazabilidad.
+Docente: ${observation.maestra}
+Obs Actual: ${observation.wows} / ${observation.wonders}
+Historial: ${historyText}
 
-        HISTORIAL RECIENTE (Últimas observaciones):
-        ${historyText}
+Genera 3 acciones estratégicas breves (máx 15 palabras cada una).
+Responde solo con la lista numerada. Sin introducciones.`;
 
-        INSTRUCCIONES:
-        1. Analiza si el 'Wonder' actual es un patrón recurrente.
-        2. Detecta si ha habido mejora en áreas señaladas anteriormente.
-        3. Genera 3 acciones altamente estratégicas y personalizadas.
-        
-        Responde ÚNICAMENTE con una lista numerada de 3 acciones (máximo 20 palabras cada una). 
-        Las acciones deben demostrar que conoces el historial (ej: "Al persistir la falta de participación, implementar técnica X...").
-        No saludes ni des introducciones.
-    `;
-
-    // List of models to try, prioritizing newer/faster ones that are available
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
-    let lastError = null;
-
-    for (const model of models) {
+    try {
+        let text = "";
         try {
-            console.log(`[SUGGESTIONS DEBUG] Trying model: ${model} for ${observation.maestra}`);
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.error) {
-                console.error(`[SUGGESTIONS ERROR] Model ${model} failed:`, result.error.message);
-                lastError = result.error;
-
-                // If quota exceeded (429), try next model immediately
-                if (result.error.code === 429 || result.error.message.includes('quota')) {
-                    continue;
-                }
-                // For other errors, maybe break or continue depending on specific error codes, 
-                // but let's try next model just in case it helps.
-                continue;
-            }
-
-            const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!text) {
-                console.warn(`[SUGGESTIONS WARN] Model ${model} returned no text.`);
-                continue;
-            }
-
-            // Success!
-            return NextResponse.json({ suggestions: text });
-
-        } catch (error) {
-            console.error(`[SUGGESTIONS EXCEPTION] Error with model ${model}:`, error);
-            lastError = error;
-            continue;
+            // Intentar con v1 (versión estable) antes que v1beta en local
+            text = await callGeminiSafe(prompt, apiKey, "gemini-2.0-flash", "v1beta");
+        } catch (e) {
+            console.warn("[SUGGESTIONS] Falló gemini-2.0-flash, intentando con gemini-2.5-flash...");
+            text = await callGeminiSafe(prompt, apiKey, "gemini-2.5-flash", "v1beta");
         }
-    }
 
-    // If all models failed
-    const errorMessage = lastError?.message || "Unknown error";
-    if (errorMessage.includes('quota') || errorMessage.includes('429')) {
-        return NextResponse.json({ suggestions: "⚠️ La cuota de IA está llena por el momento. Por favor espera un minuto e intenta de nuevo." });
+        return NextResponse.json({ suggestions: text });
+    } catch (error: any) {
+        const isQuota = error.message.includes("429") || error.message.toLowerCase().includes("quota");
+        return NextResponse.json({
+            suggestions: isQuota
+                ? "⚠️ **Google está saturado (Cuota llena).**\n\nPor favor, espera **10 segundos** e intenta de nuevo."
+                : `No se pudieron generar sugerencias. (Detalle: ${error.message.substring(0, 50)})`
+        });
     }
-
-    return NextResponse.json({ suggestions: `No se pudieron generar sugerencias. Error: ${errorMessage}` });
 }

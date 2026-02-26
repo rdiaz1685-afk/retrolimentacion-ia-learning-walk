@@ -10,7 +10,6 @@ export async function getCampusData(campusName: string, accessToken: string) {
 
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
-
     const sheets = google.sheets({ version: "v4", auth });
 
     const rowToObj = (rows: any[][] | null | undefined) => {
@@ -139,11 +138,9 @@ export async function getCampusData(campusName: string, accessToken: string) {
             classrooms: normalizedClassrooms
         };
     } catch (error: any) {
-        if (error.code === 401 || (error.response && error.response.status === 401)) {
-            console.warn(`[AUTH ERROR] Access token expired or invalid for ${campusName}.`);
-            return { evaluations: [], teachers: [], users: [], classrooms: [] };
-        }
-        console.error(`Error fetching data for campus ${campusName}:`, error);
+        const status = error.code || error.response?.status || error.status || "unknown";
+        const msg = error.message || error.response?.data?.error?.message || "error desconocido";
+        console.error(`[getCampusData] ERROR campus "${campusName}" - HTTP ${status}: ${msg}`);
         return { evaluations: [], teachers: [], users: [], classrooms: [] };
     }
 }
@@ -154,11 +151,21 @@ export async function getAllData(accessToken: string) {
     const allTeachers: any[] = [];
     const allUsers: any[] = [];
 
+    console.log("[getAllData] Iniciando fetch de campus:", Object.keys(CAMPUS_DATA));
+
     for (const campusName of Object.keys(CAMPUS_DATA)) {
-        const { evaluations, teachers, users } = await getCampusData(campusName, accessToken);
-        allEvaluations.push(...evaluations.map(item => ({ ...item, campus: campusName })));
-        allTeachers.push(...teachers.map(item => ({ ...item, campus: campusName })));
-        allUsers.push(...users.map(item => ({ ...item, campus: campusName })));
+        try {
+            const { evaluations, teachers, users } = await getCampusData(campusName, accessToken);
+            console.log(`[getAllData] "${campusName}": ${evaluations.length} evaluaciones`);
+            allEvaluations.push(...evaluations.map(item => ({ ...item, campus: campusName })));
+            allTeachers.push(...teachers.map(item => ({ ...item, campus: campusName })));
+            allUsers.push(...users.map(item => ({ ...item, campus: campusName })));
+        } catch (err: any) {
+            console.error(`[getAllData] ERROR en "${campusName}":`, err?.message || err);
+        }
     }
+
+    console.log(`[getAllData] TOTAL acumulado: ${allEvaluations.length} evaluaciones`);
     return { evaluations: allEvaluations, teachers: allTeachers, users: allUsers };
 }
+
